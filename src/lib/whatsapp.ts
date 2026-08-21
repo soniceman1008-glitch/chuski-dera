@@ -1,9 +1,8 @@
-import { findItem, formatRs, RESTAURANT } from "./menu";
-import type { CartLine, Customer } from "./cart-store";
-import { cartTotal } from "./cart-store";
+import { formatRs, RESTAURANT } from "./menu";
+import type { CartLine, Customer, PricedItem } from "./cart-store";
+import { cartTotal, resolveCartItem } from "./cart-store";
+import { WA_E164 } from "./phone";
 
-/** Always international format for wa.me links. */
-const WA_NUMBER = "923139235654";
 const TZ = "Asia/Karachi";
 
 function stamp(now = new Date()) {
@@ -22,9 +21,14 @@ function stamp(now = new Date()) {
   return { date, time };
 }
 
-export function buildOrderMessage(lines: CartLine[], customer: Customer, now = new Date()) {
+export function buildOrderMessage(
+  lines: CartLine[],
+  customer: Customer,
+  now = new Date(),
+  catalog?: PricedItem[] | null,
+) {
   const { date, time } = stamp(now);
-  const subtotal = cartTotal(lines);
+  const subtotal = cartTotal(lines, catalog);
   const delivery = 0;
   const grand = subtotal + delivery;
   const rows: string[] = [];
@@ -39,7 +43,7 @@ export function buildOrderMessage(lines: CartLine[], customer: Customer, now = n
   rows.push("");
   rows.push("*Items*");
   for (const line of lines) {
-    const item = findItem(line.id);
+    const item = resolveCartItem(line.id, catalog);
     if (!item) continue;
     const lineTotal = item.price * line.qty;
     rows.push(
@@ -55,14 +59,19 @@ export function buildOrderMessage(lines: CartLine[], customer: Customer, now = n
   return rows.join("\n");
 }
 
-export function whatsappOrderHref(lines: CartLine[], customer: Customer, now = new Date()) {
-  const url = new URL(`https://wa.me/${WA_NUMBER}`);
-  url.searchParams.set("text", buildOrderMessage(lines, customer, now));
+export function whatsappOrderHref(
+  lines: CartLine[],
+  customer: Customer,
+  now = new Date(),
+  catalog?: PricedItem[] | null,
+) {
+  const url = new URL(`https://wa.me/${WA_E164}`);
+  url.searchParams.set("text", buildOrderMessage(lines, customer, now, catalog));
   return url.toString();
 }
 
 export function whatsappBlankHref() {
-  const url = new URL(`https://wa.me/${WA_NUMBER}`);
+  const url = new URL(`https://wa.me/${WA_E164}`);
   url.searchParams.set("text", `Hi ${RESTAURANT.name}, I'd like to order.`);
   return url.toString();
 }

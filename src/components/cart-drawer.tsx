@@ -1,12 +1,14 @@
 import { Link } from "@tanstack/react-router";
 import { ShoppingBag, Trash2, X } from "lucide-react";
-import { findItem, formatRs } from "@/lib/menu";
-import { cartTotal, itemCount, useCart } from "@/lib/cart-store";
+import { formatRs } from "@/lib/menu";
+import { cartTotal, itemCount, resolveCartItem, useCart } from "@/lib/cart-store";
 import { QtyStepper } from "@/components/qty-stepper";
 import { useHasMounted } from "@/lib/use-has-mounted";
+import { usePublicMenu } from "@/lib/catalog-store";
 
 export function CartDrawer() {
   const mounted = useHasMounted();
+  const catalog = usePublicMenu();
   const open = useCart((s) => s.drawerOpen);
   const setOpen = useCart((s) => s.setDrawerOpen);
   const lines = useCart((s) => s.lines);
@@ -17,7 +19,7 @@ export function CartDrawer() {
 
   const visible = mounted ? lines : [];
   const count = itemCount(visible);
-  const total = cartTotal(visible);
+  const total = cartTotal(visible, catalog);
 
   if (!open) return null;
 
@@ -52,7 +54,7 @@ export function CartDrawer() {
           ) : (
             <ul className="divide-y divide-border">
               {visible.map((line) => {
-                const item = findItem(line.id);
+                const item = resolveCartItem(line.id, catalog);
                 if (!item) return null;
                 return (
                   <li key={line.id} className="flex gap-3 py-4">

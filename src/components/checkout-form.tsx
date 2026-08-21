@@ -1,7 +1,7 @@
 import { useRef, useState, type FormEvent } from "react";
 import { Link } from "@tanstack/react-router";
-import { findItem, formatRs } from "@/lib/menu";
-import { cartTotal, itemCount, useCart } from "@/lib/cart-store";
+import { formatRs } from "@/lib/menu";
+import { cartTotal, itemCount, resolveCartItem, useCart } from "@/lib/cart-store";
 import { whatsappOrderHref } from "@/lib/whatsapp";
 import { QtyStepper } from "@/components/qty-stepper";
 import { OrderConfirmModal } from "@/components/order-confirm-modal";
@@ -9,9 +9,11 @@ import { playOrderClip, stopOrderClip } from "@/lib/choice-voice";
 import { useHasMounted } from "@/lib/use-has-mounted";
 import { placeOrder } from "@/lib/server/orders";
 import { notifyOrdersChanged } from "@/lib/catalog-sync";
+import { usePublicMenu } from "@/lib/catalog-store";
 
 export function CheckoutForm() {
   const mounted = useHasMounted();
+  const catalog = usePublicMenu();
   const lines = useCart((s) => s.lines);
   const customer = useCart((s) => s.customer);
   const add = useCart((s) => s.add);
@@ -27,7 +29,7 @@ export function CheckoutForm() {
 
   const visible = mounted ? lines : [];
   const info = mounted ? customer : { name: "", phone: "", address: "" };
-  const total = cartTotal(visible);
+  const total = cartTotal(visible, catalog);
   const count = itemCount(visible);
 
   function openWhatsApp() {
@@ -70,7 +72,7 @@ export function CheckoutForm() {
       address: info.address,
     };
     waSentRef.current = false;
-    waHrefRef.current = whatsappOrderHref(snapshotLines, snapshotCustomer, new Date());
+    waHrefRef.current = whatsappOrderHref(snapshotLines, snapshotCustomer, new Date(), catalog);
     setWaReady(false);
     setWaOpened(false);
     setPhase("done");
@@ -117,7 +119,7 @@ export function CheckoutForm() {
           ) : (
             <ul className="mt-6 divide-y divide-border rounded-xl bg-surface px-4 shadow-[var(--shadow-card)]">
               {visible.map((line) => {
-                const item = findItem(line.id);
+                const item = resolveCartItem(line.id, catalog);
                 if (!item) return null;
                 return (
                   <li key={line.id} className="flex items-center gap-3 py-4">
