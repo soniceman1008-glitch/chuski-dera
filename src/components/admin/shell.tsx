@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { Bell, LayoutDashboard, Menu, Settings, ShoppingBag, Users, X } from "lucide-react";
+import { Bell, LayoutDashboard, Menu, Phone, Settings, ShoppingBag, Users, X } from "lucide-react";
 import { UserButton } from "@/lib/auth/gates";
 import { LogoMark } from "@/components/logo-mark";
 import { newOrderCount } from "@/lib/server/orders";
@@ -10,6 +10,7 @@ const NAV = [
   { to: "/admin", label: "Overview", icon: LayoutDashboard },
   { to: "/admin/menu", label: "Menu", icon: Menu },
   { to: "/admin/orders", label: "Orders", icon: ShoppingBag },
+  { to: "/admin/calls", label: "Voice calls", icon: Phone },
   { to: "/admin/customers", label: "Customers", icon: Users },
   { to: "/admin/settings", label: "Settings", icon: Settings },
 ] as const;
