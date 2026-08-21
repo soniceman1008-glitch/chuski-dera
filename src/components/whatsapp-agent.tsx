@@ -23,7 +23,6 @@ import {
   type AgentState,
 } from "@/lib/wa-agent";
 
-/** Web AI Agent header — always show this local number (never stale bundle value). */
 const AGENT_PHONE_DISPLAY = "0313-9235654";
 
 type VoicePhase = "idle" | "asking" | "recording" | "preview" | "processing" | "speaking";
@@ -75,10 +74,17 @@ export function WhatsAppAgent({
       const next = initialAgentState(customer);
       setState(next);
       const hello = greet("ru");
-      setMsgs([{ id: idRef.current++, role: "bot", text: hello, voice: true, lang: "ru" }]);
+      const id = idRef.current++;
+      setMsgs([{ id, role: "bot", text: hello, voice: true, lang: "ru" }]);
       setBooted(true);
       setPhase("speaking");
-      void speakAgentReply(hello, "ru").finally(() => setPhase("idle"));
+      void speakAgentReply(hello, "ru").then((url) => {
+        if (url) {
+          urlsRef.current.push(url);
+          setMsgs((m) => m.map((row) => (row.id === id ? { ...row, audioUrl: url } : row)));
+        }
+        setPhase("idle");
+      });
     }
   }, [open, booted, customer]);
 
@@ -111,7 +117,9 @@ export function WhatsAppAgent({
     lang?: AgentLang,
   ) {
     if (audioUrl) urlsRef.current.push(audioUrl);
-    setMsgs((m) => [...m, { id: idRef.current++, role, text, voice, audioUrl, lang }]);
+    const id = idRef.current++;
+    setMsgs((m) => [...m, { id, role, text, voice, audioUrl, lang }]);
+    return id;
   }
 
   function send(text: string, viaVoice = false, audioUrl: string | null = null) {
@@ -123,9 +131,13 @@ export function WhatsAppAgent({
       const ask = clarifyLanguage(stateRef.current.lang);
       window.setTimeout(() => {
         void (async () => {
-          push("bot", ask, true, null, stateRef.current.lang);
+          const id = push("bot", ask, true, null, stateRef.current.lang);
           setPhase("speaking");
-          await speakAgentReply(ask, stateRef.current.lang);
+          const url = await speakAgentReply(ask, stateRef.current.lang);
+          if (url) {
+            urlsRef.current.push(url);
+            setMsgs((m) => m.map((row) => (row.id === id ? { ...row, audioUrl: url } : row)));
+          }
           setPhase("idle");
         })();
       }, 200);
@@ -146,9 +158,13 @@ export function WhatsAppAgent({
     window.setTimeout(() => {
       void (async () => {
         for (const line of result.messages) {
-          push("bot", line, viaVoice, null, result.state.lang);
+          const id = push("bot", line, true, null, result.state.lang);
           setPhase("speaking");
-          await speakAgentReply(line, result.state.lang);
+          const url = await speakAgentReply(line, result.state.lang);
+          if (url) {
+            urlsRef.current.push(url);
+            setMsgs((m) => m.map((row) => (row.id === id ? { ...row, audioUrl: url } : row)));
+          }
         }
         setPhase("idle");
         if (result.sendWhatsApp && result.state.lines.length) {
@@ -273,7 +289,13 @@ export function WhatsAppAgent({
   async function replayBot(msg: ChatMsg) {
     stopAgentVoice();
     setPhase("speaking");
-    await speakAgentReply(msg.text, msg.lang ?? stateRef.current.lang);
+    if (msg.audioUrl) {
+      const a = new Audio(msg.audioUrl);
+      a.setAttribute("playsinline", "true");
+      await a.play().catch(() => speakAgentReply(msg.text, msg.lang ?? stateRef.current.lang));
+    } else {
+      await speakAgentReply(msg.text, msg.lang ?? stateRef.current.lang);
+    }
     setPhase("idle");
   }
 
@@ -319,7 +341,7 @@ export function WhatsAppAgent({
                     : "max-w-[85%] rounded-lg rounded-tl-sm bg-[#1f2c34] px-3 py-2 text-sm leading-relaxed text-[#e9edef]"
                 }
               >
-                {msg.voice ? (
+                {msg.role === "bot" || msg.voice ? (
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] tracking-wide text-white/60 uppercase">
                       {msg.role === "user" ? "Voice message" : "Voice reply"}
@@ -339,7 +361,7 @@ export function WhatsAppAgent({
                 {msg.audioUrl ? (
                   <audio controls src={msg.audioUrl} className="mt-1 max-w-full" preload="metadata" />
                 ) : null}
-                {msg.voice ? null : <p className="whitespace-pre-wrap">{msg.text}</p>}
+                {msg.role === "bot" || msg.voice ? null : <p className="whitespace-pre-wrap">{msg.text}</p>}
               </div>
             </div>
           ))}
