@@ -1,18 +1,22 @@
 import type { Sql } from "@/lib/db";
 import { CATEGORIES, FOOD_CATEGORIES, MENU, RESTAURANT } from "@/lib/menu";
 
-const CALL_DISPLAY = "03717400624";
-const CALL_TEL = "+923717400624";
+const PHONE_DISPLAY = "+923139235645";
+const PHONE_TEL = "+923139235645";
 
 export async function seedIfEmpty(sql: Sql) {
   await sql`
     update settings
     set
-      call_display = ${CALL_DISPLAY},
-      call_tel = ${CALL_TEL},
+      call_display = ${PHONE_DISPLAY},
+      call_tel = ${PHONE_TEL},
+      wa_display = ${PHONE_DISPLAY},
+      wa_tel = ${PHONE_TEL},
       updated_at = now()
-    where call_display in ('03139235654', '0313-9235654', '0313-9235645')
-       or call_tel in ('+923139235654', '03139235654', '+923139235645')
+    where call_display in ('03717400624', '0371-7400624', '03139235654', '0313-9235654')
+       or call_tel in ('+923717400624', '03717400624', '+923139235654', '03139235654')
+       or wa_display in ('03717400624', '0371-7400624')
+       or wa_tel in ('+923717400624', '03717400624')
   `;
 
   const existing = await sql<{ n: number }>`select count(*)::int as n from settings`;
@@ -30,10 +34,10 @@ export async function seedIfEmpty(sql: Sql) {
       ${RESTAURANT.address},
       ${RESTAURANT.city},
       ${"12:00 PM – 12:00 AM"},
-      ${CALL_DISPLAY},
-      ${CALL_TEL},
-      ${RESTAURANT.phoneDisplay},
-      ${RESTAURANT.phoneTel},
+      ${PHONE_DISPLAY},
+      ${PHONE_TEL},
+      ${PHONE_DISPLAY},
+      ${PHONE_TEL},
       ${RESTAURANT.mapsQuery}
     )
     on conflict (id) do nothing
