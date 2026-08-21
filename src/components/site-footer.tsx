@@ -1,14 +1,15 @@
 import { Link } from "@tanstack/react-router";
 import { Phone } from "lucide-react";
-import { RESTAURANT } from "@/lib/menu";
 import { CallLink } from "@/components/call-link";
+import { useRestaurant } from "@/lib/catalog-store";
 
 export function SiteFooter() {
+  const shop = useRestaurant();
   return (
     <footer className="mt-auto border-t border-border bg-elevated text-fg">
       <div className="mx-auto grid max-w-6xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-3">
         <div>
-          <p className="font-display text-3xl tracking-wide">{RESTAURANT.name}</p>
+          <p className="font-display text-3xl tracking-wide">{shop.name}</p>
           <p className="mt-3 max-w-xs text-sm leading-relaxed text-muted">
             Fast food from Satellite Town. Burgers, shawarma, wraps, wings — packed hot for
             delivery across Jhang.
@@ -16,10 +17,11 @@ export function SiteFooter() {
         </div>
         <div>
           <p className="text-xs font-semibold tracking-[0.16em] text-subtle uppercase">Visit</p>
-          <p className="mt-3 text-sm leading-relaxed text-muted">{RESTAURANT.address}</p>
+          <p className="mt-3 text-sm leading-relaxed text-muted">{shop.address}</p>
+          {shop.hours ? <p className="mt-1 text-xs text-subtle">{shop.hours}</p> : null}
           <CallLink className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary-hot">
             <Phone className="size-4" />
-            {RESTAURANT.callDisplay}
+            {shop.callDisplay}
           </CallLink>
         </div>
         <div>
