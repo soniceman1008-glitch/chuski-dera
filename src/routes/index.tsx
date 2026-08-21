@@ -8,7 +8,8 @@ import { itemCount, useCart } from "@/lib/cart-store";
 import { useCatalog } from "@/lib/catalog-store";
 import { useHasMounted } from "@/lib/use-has-mounted";
 
-const CALL_DISPLAY = "+923139235654";
+/** Canonical public display — never use DB for this string (avoids stale +923139235645). */
+const CALL_DISPLAY = "0313-9235654";
 
 export const Route = createFileRoute("/")({ component: Home });
 
