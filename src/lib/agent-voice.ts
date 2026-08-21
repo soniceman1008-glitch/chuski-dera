@@ -1,5 +1,5 @@
 import type { VoiceLang } from "./voice-lang";
-import { nlpClean, nlpSpeakable, pickAsrTranscript } from "./nlp";
+import { nlpClean, nlpSpeakable } from "./nlp";
 
 let current: HTMLAudioElement | null = null;
 
@@ -139,21 +139,6 @@ export async function requestMicPermission(): Promise<{ ok: boolean; error?: str
   }
 }
 
-type Recog = {
-  lang: string;
-  interimResults: boolean;
-  continuous: boolean;
-  maxAlternatives: number;
-  onresult: ((ev: {
-    results: ArrayLike<{ isFinal?: boolean; length: number; [i: number]: { transcript: string; confidence?: number } }>;
-  }) => void) | null;
-  onerror: ((ev: { error: string }) => void) | null;
-  onend: (() => void) | null;
-  start: () => void;
-  stop: () => void;
-  abort: () => void;
-};
-
 export type VoiceCaptureResult = {
   transcript: string;
   audioUrl: string | null;
@@ -161,19 +146,27 @@ export type VoiceCaptureResult = {
   durationMs: number;
 };
 
-function recogLangs(hint: VoiceLang): string[] {
-  if (hint === "en") return ["en-IN"];
-  if (hint === "hi") return ["hi-IN"];
-  if (hint === "pa") return ["pa-IN"];
-  return ["ur-PK"];
+function pickMime(): string {
+  if (typeof MediaRecorder === "undefined") return "";
+  const types = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"];
+  return types.find((t) => MediaRecorder.isTypeSupported(t)) ?? "";
 }
 
-function speechCtor(): (new () => Recog) | null {
-  const w = window as unknown as {
-    SpeechRecognition?: new () => Recog;
-    webkitSpeechRecognition?: new () => Recog;
-  };
-  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
+async function transcribeBlob(blob: Blob): Promise<string> {
+  const file = new File([blob], blob.type.includes("mp4") ? "speech.mp4" : "speech.webm", {
+    type: blob.type || "audio/webm",
+  });
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch("/api/transcribe", { method: "POST", body: form });
+  let data: { text?: string; error?: string } = {};
+  try {
+    data = (await res.json()) as { text?: string; error?: string };
+  } catch {
+    data = {};
+  }
+  if (!res.ok) throw new Error(data.error || "Awaaz samajh nahi aayi.");
+  return String(data.text ?? "").trim();
 }
 
 export type VoiceSession = {
@@ -182,74 +175,38 @@ export type VoiceSession = {
   cancel: () => void;
 };
 
-function bestTranscript(parts: string[]) {
-  return nlpClean(pickAsrTranscript(parts));
-}
-
-export function createVoiceSession(lang: VoiceLang): VoiceSession {
-  const recogs: Recog[] = [];
-  const transcripts: string[] = [];
+export function createVoiceSession(_lang: VoiceLang): VoiceSession {
+  let stream: MediaStream | null = null;
+  let recorder: MediaRecorder | null = null;
+  const chunks: BlobPart[] = [];
   let startedAt = 0;
   let stopped = false;
 
   const tearDown = () => {
-    for (const r of recogs) {
-      try {
-        r.abort();
-      } catch {
-        /* */
-      }
-    }
-    recogs.length = 0;
-  };
-
-  const startOne = (code: string) => {
-    const Ctor = speechCtor();
-    if (!Ctor) return;
     try {
-      const recog = new Ctor();
-      recog.lang = code;
-      recog.interimResults = true;
-      recog.continuous = false;
-      recog.maxAlternatives = 5;
-      recog.onresult = (ev) => {
-        for (let i = 0; i < ev.results.length; i++) {
-          const row = ev.results[i];
-          if (!row) continue;
-          const altCount = typeof row.length === "number" ? row.length : 1;
-          for (let a = 0; a < altCount; a++) {
-            const alt = row[a]?.transcript?.trim();
-            if (alt) transcripts.push(alt);
-          }
-        }
-      };
-      recog.onerror = () => {
-        /* wait for stop */
-      };
-      recog.onend = () => {
-        if (stopped) return;
-        try {
-          recog.start();
-        } catch {
-          /* */
-        }
-      };
-      recog.start();
-      recogs.push(recog);
+      if (recorder && recorder.state !== "inactive") recorder.stop();
     } catch {
       /* */
     }
+    stream?.getTracks().forEach((t) => t.stop());
+    stream = null;
+    recorder = null;
   };
 
   return {
     async start() {
       stopped = false;
-      transcripts.length = 0;
-      if (!speechCtor()) {
-        throw new Error("Is browser mein voice recognition nahi hai. Chrome use karein.");
-      }
+      chunks.length = 0;
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
+      });
+      const mime = pickMime();
+      recorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data);
+      };
+      recorder.start(250);
       startedAt = Date.now();
-      startOne(recogLangs(lang)[0] ?? "ur-PK");
     },
 
     stop() {
@@ -260,29 +217,41 @@ export function createVoiceSession(lang: VoiceLang): VoiceSession {
         }
         stopped = true;
         const durationMs = startedAt ? Date.now() - startedAt : 0;
-        for (const r of recogs) {
-          try {
-            r.stop();
-          } catch {
-            /* */
+        const finish = async () => {
+          stream?.getTracks().forEach((t) => t.stop());
+          stream = null;
+          let audioBlob: Blob | null = null;
+          let audioUrl: string | null = null;
+          let transcript = "";
+          if (chunks.length) {
+            audioBlob = new Blob(chunks, { type: recorder?.mimeType || "audio/webm" });
+            audioUrl = URL.createObjectURL(audioBlob);
+            try {
+              transcript = nlpClean(await transcribeBlob(audioBlob));
+            } catch {
+              transcript = "";
+            }
           }
+          recorder = null;
+          resolve({ transcript, audioUrl, audioBlob, durationMs });
+        };
+        if (recorder && recorder.state !== "inactive") {
+          recorder.onstop = () => void finish();
+          try {
+            recorder.stop();
+          } catch {
+            void finish();
+          }
+        } else {
+          void finish();
         }
-        window.setTimeout(() => {
-          recogs.length = 0;
-          resolve({
-            transcript: bestTranscript(transcripts),
-            audioUrl: null,
-            audioBlob: null,
-            durationMs,
-          });
-        }, 350);
       });
     },
 
     cancel() {
       stopped = true;
       tearDown();
-      transcripts.length = 0;
+      chunks.length = 0;
     },
   };
 }
