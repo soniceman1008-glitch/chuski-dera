@@ -20,7 +20,7 @@ export const Route = createRootRoute({
       {
         name: "description",
         content:
-          "Chuski Dera — burgers, shawarma, juices and shakes in Satellite Town, Jhang. Call 03139235654.",
+          "Chuski Dera — burgers, shawarma, juices and shakes in Satellite Town, Jhang. Call +923139235654.",
       },
       { name: "theme-color", content: "#0b0b0b" },
       { name: "apple-mobile-web-app-title", content: APP_NAME },
