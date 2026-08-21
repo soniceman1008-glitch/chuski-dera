@@ -3,8 +3,8 @@ import { CATEGORIES, FOOD_CATEGORIES, MENU, RESTAURANT } from "@/lib/menu";
 
 const CALL_DISPLAY = "03139235654";
 const CALL_TEL = "+923139235654";
-const WA_DISPLAY = "0313-9235645";
-const WA_TEL = "+923139235645";
+const WA_DISPLAY = "03139235654";
+const WA_TEL = "+923139235654";
 
 export async function seedIfEmpty(sql: Sql) {
   await sql`
@@ -12,6 +12,8 @@ export async function seedIfEmpty(sql: Sql) {
     set
       call_display = ${CALL_DISPLAY},
       call_tel = ${CALL_TEL},
+      wa_display = ${WA_DISPLAY},
+      wa_tel = ${WA_TEL},
       updated_at = now()
     where id = 'main'
   `;
