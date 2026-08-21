@@ -38,7 +38,8 @@ Go to **/admin**. Sign up with email + password (8+ characters). The first accou
 - **Orders** — checkout tickets land here.
 - **Customers** — search by name or phone.
 - **Settings**
-  - **Call** is `03139235654` / `tel:+923139235654`.
-  - **WhatsApp** stays `0313-9235645` / `+923139235645`. Do not mix them.
+  - **Call** and **WhatsApp** both use `03139235654` / `+923139235654`.
+  - Call link: `tel:+923139235654`
+  - WhatsApp link: `https://wa.me/923139235654`
 
 If `DATABASE_URL` is missing, the site shows an error instead of a fake default menu.
