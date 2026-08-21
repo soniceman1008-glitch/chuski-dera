@@ -11,8 +11,7 @@ export async function seedIfEmpty(sql: Sql) {
       call_display = ${CALL_DISPLAY},
       call_tel = ${CALL_TEL},
       updated_at = now()
-    where id = ${"main"}
-       or call_display in ('03139235654', '0313-9235654', '0313-9235645')
+    where call_display in ('03139235654', '0313-9235654', '0313-9235645')
        or call_tel in ('+923139235654', '03139235654', '+923139235645')
   `;
 
