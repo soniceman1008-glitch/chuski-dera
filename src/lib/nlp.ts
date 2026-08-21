@@ -15,30 +15,43 @@ export type NlpIntent =
   | "chat";
 
 const SPELL: [RegExp, string][] = [
-  [/\bjinger\b/g, "zinger"],
-  [/\bzingar\b/g, "zinger"],
-  [/\bzingr\b/g, "zinger"],
-  [/\bberger\b/g, "burger"],
-  [/\bbargar\b/g, "burger"],
-  [/\bshwarma\b/g, "shawarma"],
-  [/\bshawerma\b/g, "shawarma"],
-  [/\bshavarma\b/g, "shawarma"],
-  [/\bnugget\b/g, "nuggets"],
-  [/\bnagets\b/g, "nuggets"],
-  [/\bwinges\b/g, "wings"],
-  [/\bmargarita\b/g, "margarita"],
-  [/\bmargarette\b/g, "margarita"],
-  [/\bchahye\b/g, "chahiye"],
-  [/\bcahiye\b/g, "chahiye"],
-  [/\bchaheye\b/g, "chahiye"],
-  [/\blenay\b/g, "lena"],
-  [/\bleney\b/g, "lena"],
-  [/\bhaanji\b/g, "haan"],
-  [/\bhanji\b/g, "haan"],
-  [/\btheek hai\b/g, "theek"],
-  [/\bokey\b/g, "ok"],
-  [/\bokay\b/g, "ok"],
+  [/\u0632\u0646\u06af\u0631|\u0632\u0646\u062c\u0631/g, "zinger"],
+  [/\u0628\u0631\u06af\u0631/g, "burger"],
+  [/\u0634\u0627\u0648\u0631\u0645\u0627|\u0634\u0627\u0648\u0631\u0645\u06c1/g, "shawarma"],
+  [/\b(singer|ginger|finger|zingerh|zingar|jinger|zingr)\b/g, "zinger"],
+  [/\b(berger|bargar|burgr|burgar)\b/g, "burger"],
+  [/\b(shwarma|shawerma|shavarma|shaorma|showarma|shewarma)\b/g, "shawarma"],
+  [/\b(nugget|nagets|nugets|nuggetts)\b/g, "nuggets"],
+  [/\b(winges|wengs|hotwings)\b/g, "wings"],
+  [/\b(fries|frise|fry)\b/g, "fries"],
+  [/\b(margarita|margarette|margaretta)\b/g, "margarita"],
+  [/\b(deal|diel|deel)\b/g, "deal"],
+  [/\b(chahye|cahiye|chaheye|chahie)\b/g, "chahiye"],
+  [/\b(lenay|leney|laina)\b/g, "lena"],
+  [/\b(haanji|hanji)\b/g, "haan"],
+  [/\b(theek hai|theek ha)\b/g, "theek"],
+  [/\b(okey|okay)\b/g, "ok"],
 ];
+
+const MENU_HINT =
+  /\b(zinger|burger|shawarma|fries|nuggets|wings|deal|menu|wrap|tea|shake|mango|mint|margarita|chahiye|lena|haan|order|price|keemat)\b/;
+
+export function scoreTranscript(text: string): number {
+  const n = nlpClean(text);
+  if (!n) return 0;
+  let s = Math.min(n.length, 80);
+  if (MENU_HINT.test(n)) s += 40;
+  const intent = nlpIntent(n);
+  if (intent !== "unclear" && intent !== "chat") s += 25;
+  if (nlpQty(n)) s += 10;
+  return s;
+}
+
+export function pickAsrTranscript(candidates: string[]): string {
+  const unique = [...new Set(candidates.map((c) => c.trim()).filter(Boolean))];
+  if (!unique.length) return "";
+  return unique.sort((a, b) => scoreTranscript(b) - scoreTranscript(a) || b.length - a.length)[0] ?? "";
+}
 
 export function nlpClean(text: string): string {
   let s = text
