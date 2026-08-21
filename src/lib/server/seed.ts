@@ -1,14 +1,18 @@
 import type { Sql } from "@/lib/db";
 import { CATEGORIES, FOOD_CATEGORIES, MENU, RESTAURANT } from "@/lib/menu";
 
+const CALL_DISPLAY = "03717400624";
+const CALL_TEL = "+923717400624";
+
 export async function seedIfEmpty(sql: Sql) {
   await sql`
     update settings
     set
-      call_display = ${RESTAURANT.callDisplay},
-      call_tel = ${RESTAURANT.callTel},
+      call_display = ${CALL_DISPLAY},
+      call_tel = ${CALL_TEL},
       updated_at = now()
-    where call_display in ('03139235654', '0313-9235654', '0313-9235645')
+    where id = ${"main"}
+       or call_display in ('03139235654', '0313-9235654', '0313-9235645')
        or call_tel in ('+923139235654', '03139235654', '+923139235645')
   `;
 
@@ -27,8 +31,8 @@ export async function seedIfEmpty(sql: Sql) {
       ${RESTAURANT.address},
       ${RESTAURANT.city},
       ${"12:00 PM – 12:00 AM"},
-      ${RESTAURANT.callDisplay},
-      ${RESTAURANT.callTel},
+      ${CALL_DISPLAY},
+      ${CALL_TEL},
       ${RESTAURANT.phoneDisplay},
       ${RESTAURANT.phoneTel},
       ${RESTAURANT.mapsQuery}
