@@ -1,4 +1,4 @@
-import { createRootRoute, HeadContent, Outlet, Scripts, useRouterState } from "@tanstack/react-router";
+import { createRootRoute, HeadContent, Link, Outlet, Scripts, useRouterState } from "@tanstack/react-router";
 import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import { SiteHeader } from "@/components/site-header";
@@ -10,6 +10,21 @@ import { CatalogProvider, CatalogStatusBanner } from "@/lib/catalog-store";
 import appCss from "../styles.css?url";
 
 const APP_NAME = "Chuski Dera";
+
+function NotFoundPage() {
+  return (
+    <main className="mx-auto max-w-6xl px-4 py-24 text-center">
+      <p className="font-display text-5xl tracking-wide">Page not found</p>
+      <p className="mt-3 text-muted">That link is not on the Chuski Dera menu.</p>
+      <Link
+        to="/"
+        className="mt-6 inline-flex h-12 items-center rounded-lg bg-primary px-5 text-sm font-semibold text-primary-fg"
+      >
+        Back to home
+      </Link>
+    </main>
+  );
+}
 
 export const Route = createRootRoute({
   head: () => ({
@@ -40,6 +55,7 @@ export const Route = createRootRoute({
     ],
   }),
   component: RootDocument,
+  notFoundComponent: NotFoundPage,
 });
 
 function RootDocument() {
