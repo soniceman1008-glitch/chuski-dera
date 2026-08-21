@@ -1,35 +1,37 @@
 import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
-import { CATEGORIES, MENU, categoryLabel, type CategoryId } from "@/lib/menu";
 import { FoodCard } from "@/components/food-card";
+import { useCatalog } from "@/lib/catalog-store";
 
 export function MenuGrid() {
+  const { items: menu, categories } = useCatalog();
   const [query, setQuery] = useState("");
-  const [cat, setCat] = useState<CategoryId | "all">("all");
+  const [cat, setCat] = useState<string>("all");
+  const chips = [{ id: "all", label: "All" }, ...categories];
 
   const items = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return MENU.filter((item) => {
+    return menu.filter((item) => {
+      if (!item.available) return false;
       if (cat !== "all" && item.category !== cat) return false;
       if (!q) return true;
-      return (
-        item.name.toLowerCase().includes(q) || item.blurb.toLowerCase().includes(q)
-      );
+      return item.name.toLowerCase().includes(q) || item.blurb.toLowerCase().includes(q);
     });
-  }, [query, cat]);
+  }, [query, cat, menu]);
 
   const groups = useMemo(() => {
     if (cat !== "all") {
-      return [{ id: cat, label: categoryLabel(cat), items }];
+      const label = chips.find((c) => c.id === cat)?.label ?? cat;
+      return [{ id: cat, label, items }];
     }
-    return CATEGORIES.filter((c) => c.id !== "all")
+    return categories
       .map((c) => ({
         id: c.id,
         label: c.label,
         items: items.filter((item) => item.category === c.id),
       }))
       .filter((g) => g.items.length > 0);
-  }, [cat, items]);
+  }, [cat, items, categories, chips]);
 
   return (
     <div>
@@ -45,7 +47,7 @@ export function MenuGrid() {
           />
         </div>
         <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
-          {CATEGORIES.map((c) => {
+          {chips.map((c) => {
             const active = cat === c.id;
             return (
               <button
@@ -65,18 +67,13 @@ export function MenuGrid() {
         </div>
       </div>
       {items.length === 0 ? (
-        <p className="mt-10 text-sm text-muted">
-          Nothing matches “{query}”. Try mango, zinger, or lime.
-        </p>
+        <p className="mt-10 text-sm text-muted">Nothing matches “{query}”. Try mango, zinger, or lime.</p>
       ) : (
         <div className="mt-8 space-y-12">
           {groups.map((group) => (
             <section key={group.id} aria-labelledby={`cat-${group.id}`}>
               {cat === "all" && (
-                <h3
-                  id={`cat-${group.id}`}
-                  className="font-display text-3xl tracking-wide text-fg"
-                >
+                <h3 id={`cat-${group.id}`} className="font-display text-3xl tracking-wide text-fg">
                   {group.label}
                 </h3>
               )}
