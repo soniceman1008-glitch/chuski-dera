@@ -3,7 +3,8 @@ import { ArrowRight, MapPin, Phone, Bike } from "lucide-react";
 import { MenuGrid } from "@/components/menu-grid";
 import { FoodCard } from "@/components/food-card";
 import { CallLink } from "@/components/call-link";
-import { FOOD_CATEGORIES, RESTAURANT } from "@/lib/menu";
+import { DealCard } from "@/components/deal-card";
+import { FOOD_CATEGORIES, MENU, RESTAURANT } from "@/lib/menu";
 import { itemCount, useCart } from "@/lib/cart-store";
 import { useCatalog } from "@/lib/catalog-store";
 import { useHasMounted } from "@/lib/use-has-mounted";
@@ -19,6 +20,8 @@ function Home() {
     (item) => item.available && item.featured && FOOD_CATEGORIES.includes(item.category as (typeof FOOD_CATEGORIES)[number]),
   );
   const promos = catalogItems.filter((item) => item.available && item.promo);
+  const catalogDeals = catalogItems.filter((item) => item.available && item.category === "deals");
+  const deals = catalogDeals.length ? catalogDeals : MENU.filter((item) => item.category === "deals");
   const lines = useCart((s) => s.lines);
   const setDrawerOpen = useCart((s) => s.setDrawerOpen);
   const mounted = useHasMounted();
@@ -127,6 +130,27 @@ function Home() {
             </li>
           ))}
         </ul>
+      </section>
+
+      <section id="deals" className="border-t border-border bg-elevated/40 px-4 py-16 sm:px-6 sm:py-20">
+        <div className="mx-auto max-w-6xl">
+          <p className="text-xs font-semibold tracking-[0.16em] text-primary uppercase">
+            Fast food deals
+          </p>
+          <h2 className="mt-2 font-display text-4xl tracking-wide sm:text-5xl">
+            Deals for one, two, or the whole table.
+          </h2>
+          <p className="mt-3 max-w-lg text-muted">
+            Bundle price is fixed. Add the deal as one item — checkout totals use that Rs. amount.
+          </p>
+          <ul className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {deals.map((item) => (
+              <li key={item.id}>
+                <DealCard item={item} />
+              </li>
+            ))}
+          </ul>
+        </div>
       </section>
 
       <section className="mx-auto max-w-6xl px-4 pb-16 sm:px-6 sm:pb-20">
