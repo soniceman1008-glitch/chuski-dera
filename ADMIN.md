@@ -37,6 +37,8 @@ Go to **/admin**. Sign up with email + password (8+ characters). The first accou
 - **Menu** — add / edit / delete items. Price, description, image URL, availability. Uncheck **Available** to hide an item on the customer site.
 - **Orders** — checkout tickets land here.
 - **Customers** — search by name or phone.
-- **Settings** — Call and WhatsApp both use `+923139235645` / `tel:+923139235645`.
+- **Settings**
+  - **Call** is `03139235654` / `tel:+923139235654`.
+  - **WhatsApp** stays `0313-9235645` / `+923139235645`. Do not mix them.
 
 If `DATABASE_URL` is missing, the site shows an error instead of a fake default menu.
