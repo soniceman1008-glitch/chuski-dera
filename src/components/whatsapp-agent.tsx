@@ -1,21 +1,28 @@
 import { useEffect, useRef, useState } from "react";
-import { Mic, Square, X } from "lucide-react";
+import { Mic, Pause, Play, RotateCcw, Send, Square, X } from "lucide-react";
 import { RESTAURANT } from "@/lib/menu";
 import { useCart } from "@/lib/cart-store";
 import { whatsappOrderHref } from "@/lib/whatsapp";
 import {
+  createVoiceSession,
   requestMicPermission,
+  revokeVoiceUrl,
   speakAgentReply,
-  startVoiceCapture,
   stopAgentVoice,
+  type VoiceCaptureResult,
+  type VoiceSession,
 } from "@/lib/agent-voice";
 import {
   agentReply,
+  clarifyLanguage,
   detectLang,
   greet,
   initialAgentState,
+  isVoiceUnclear,
   type AgentState,
 } from "@/lib/wa-agent";
+
+type VoicePhase = "idle" | "asking" | "recording" | "preview" | "processing" | "speaking";
 
 type ChatMsg = {
   id: number;
@@ -24,6 +31,11 @@ type ChatMsg = {
   voice?: boolean;
   audioUrl?: string | null;
 };
+
+function formatTimer(ms: number) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
 
 export function WhatsAppAgent({
   open,
@@ -38,12 +50,18 @@ export function WhatsAppAgent({
   const [msgs, setMsgs] = useState<ChatMsg[]>([]);
   const [draft, setDraft] = useState("");
   const [booted, setBooted] = useState(false);
-  const [listening, setListening] = useState(false);
-  const [speaking, setSpeaking] = useState(false);
+  const [phase, setPhase] = useState<VoicePhase>("idle");
+  const [denied, setDenied] = useState<string | null>(null);
+  const [elapsed, setElapsed] = useState(0);
+  const [preview, setPreview] = useState<VoiceCaptureResult | null>(null);
+  const [previewPlaying, setPreviewPlaying] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
   const idRef = useRef(1);
   const stateRef = useRef(state);
-  const stopListen = useRef<(() => void) | null>(null);
+  const sessionRef = useRef<VoiceSession | null>(null);
+  const previewAudio = useRef<HTMLAudioElement | null>(null);
+  const tickRef = useRef<number | null>(null);
+  const urlsRef = useRef<string[]>([]);
   stateRef.current = state;
 
   useEffect(() => {
@@ -54,7 +72,8 @@ export function WhatsAppAgent({
       const hello = greet("ru");
       setMsgs([{ id: idRef.current++, role: "bot", text: hello, voice: true }]);
       setBooted(true);
-      void speakAgentReply(hello, "ru");
+      setPhase("speaking");
+      void speakAgentReply(hello, "ru").finally(() => setPhase("idle"));
     }
   }, [open, booted, customer]);
 
@@ -62,24 +81,48 @@ export function WhatsAppAgent({
     if (!open) {
       setBooted(false);
       stopAgentVoice();
-      stopListen.current?.();
-      setListening(false);
-      setSpeaking(false);
+      sessionRef.current?.cancel();
+      sessionRef.current = null;
+      previewAudio.current?.pause();
+      if (tickRef.current) window.clearInterval(tickRef.current);
+      urlsRef.current.forEach((u) => revokeVoiceUrl(u));
+      urlsRef.current = [];
+      setPhase("idle");
+      setDenied(null);
+      setPreview(null);
+      setElapsed(0);
     }
   }, [open]);
 
   useEffect(() => {
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: "smooth" });
-  }, [msgs, open]);
+  }, [msgs, open, phase]);
 
   function push(role: ChatMsg["role"], text: string, voice = false, audioUrl: string | null = null) {
+    if (audioUrl) urlsRef.current.push(audioUrl);
     setMsgs((m) => [...m, { id: idRef.current++, role, text, voice, audioUrl }]);
   }
 
   function send(text: string, viaVoice = false, audioUrl: string | null = null) {
     const value = text.trim();
+    if (!viaVoice && !value) return;
+
+    if (viaVoice && isVoiceUnclear(value)) {
+      if (audioUrl) push("user", "", true, audioUrl);
+      const ask = clarifyLanguage(stateRef.current.lang);
+      window.setTimeout(() => {
+        void (async () => {
+          push("bot", ask, true);
+          setPhase("speaking");
+          await speakAgentReply(ask, stateRef.current.lang);
+          setPhase("idle");
+        })();
+      }, 200);
+      return;
+    }
+
     if (!value) return;
-    // Voice path: show as audio bubble, not plain text
+
     if (viaVoice) {
       push("user", value, true, audioUrl);
     } else {
@@ -92,14 +135,13 @@ export function WhatsAppAgent({
     window.setTimeout(() => {
       void (async () => {
         for (const line of result.messages) {
-          // Voice conversation: mark bot as voice; still keep short text for accessibility
           push("bot", line, viaVoice);
           if (viaVoice) {
-            setSpeaking(true);
+            setPhase("speaking");
             await speakAgentReply(line, result.state.lang);
-            setSpeaking(false);
           }
         }
+        setPhase("idle");
         if (result.sendWhatsApp && result.state.lines.length) {
           setCustomer(result.state.customer);
           window.open(
@@ -109,49 +151,126 @@ export function WhatsAppAgent({
           );
         }
       })();
-    }, 280);
+    }, 220);
   }
 
-  async function toggleMic() {
-    if (listening) {
-      stopListen.current?.();
-      stopListen.current = null;
-      setListening(false);
-      return;
+  function clearPreview() {
+    previewAudio.current?.pause();
+    previewAudio.current = null;
+    setPreviewPlaying(false);
+    if (preview?.audioUrl && !urlsRef.current.includes(preview.audioUrl)) {
+      revokeVoiceUrl(preview.audioUrl);
     }
+    setPreview(null);
+  }
 
+  async function beginRecord() {
+    if (phase === "recording" || phase === "processing" || phase === "speaking") return;
+    setDenied(null);
+    clearPreview();
     stopAgentVoice();
-    setSpeaking(false);
-
+    setPhase("asking");
     const perm = await requestMicPermission();
     if (!perm.ok) {
-      push("bot", perm.error ?? "Mic permission chahiye.");
+      setDenied(perm.error ?? "Mic permission chahiye.");
+      setPhase("idle");
       return;
     }
+    const session = createVoiceSession(stateRef.current.lang);
+    sessionRef.current = session;
+    try {
+      await session.start();
+    } catch {
+      setDenied("Microphone start nahi ho saka. Permission check karein.");
+      setPhase("idle");
+      return;
+    }
+    setElapsed(0);
+    setPhase("recording");
+    if (tickRef.current) window.clearInterval(tickRef.current);
+    const t0 = Date.now();
+    tickRef.current = window.setInterval(() => {
+      const ms = Date.now() - t0;
+      setElapsed(ms);
+      if (ms >= 60_000) void stopRecord();
+    }, 200);
+  }
 
-    setListening(true);
-    stopListen.current = startVoiceCapture(
-      stateRef.current.lang,
-      (result) => {
-        setListening(false);
-        stopListen.current = null;
-        // Detect language from spoken words so AI replies in same language
-        if (result.transcript && result.transcript !== "(voice)") {
-          const lang = detectLang(result.transcript);
-          stateRef.current = { ...stateRef.current, lang };
-          setState(stateRef.current);
-        }
-        send(result.transcript, true, result.audioUrl);
-      },
-      (msg) => {
-        setListening(false);
-        stopListen.current = null;
-        push("bot", msg);
-      },
-    );
+  async function stopRecord() {
+    if (tickRef.current) {
+      window.clearInterval(tickRef.current);
+      tickRef.current = null;
+    }
+    const session = sessionRef.current;
+    sessionRef.current = null;
+    if (!session) {
+      setPhase("idle");
+      return;
+    }
+    const result = await session.stop();
+    if (!result.audioUrl && !result.transcript) {
+      setDenied("Kuch record nahi hua. Mic dabakar dobara bolein.");
+      setPhase("idle");
+      return;
+    }
+    setPreview(result);
+    setPhase("preview");
+  }
+
+  function cancelRecord() {
+    if (tickRef.current) {
+      window.clearInterval(tickRef.current);
+      tickRef.current = null;
+    }
+    sessionRef.current?.cancel();
+    sessionRef.current = null;
+    clearPreview();
+    setElapsed(0);
+    setPhase("idle");
+  }
+
+  function togglePreviewPlay() {
+    if (!preview?.audioUrl) return;
+    if (!previewAudio.current) {
+      const a = new Audio(preview.audioUrl);
+      a.setAttribute("playsinline", "true");
+      a.addEventListener("ended", () => setPreviewPlaying(false));
+      previewAudio.current = a;
+    }
+    if (previewPlaying) {
+      previewAudio.current.pause();
+      setPreviewPlaying(false);
+      return;
+    }
+    void previewAudio.current.play().then(() => setPreviewPlaying(true)).catch(() => setPreviewPlaying(false));
+  }
+
+  function sendPreview() {
+    if (!preview) return;
+    const clip = preview;
+    setPreview(null);
+    previewAudio.current?.pause();
+    previewAudio.current = null;
+    setPreviewPlaying(false);
+    setPhase("processing");
+    if (clip.transcript && clip.transcript !== "(voice)") {
+      const lang = detectLang(clip.transcript, stateRef.current.lang);
+      stateRef.current = { ...stateRef.current, lang };
+      setState(stateRef.current);
+    }
+    send(clip.transcript || "(voice)", true, clip.audioUrl);
+  }
+
+  async function replayBot(text: string) {
+    stopAgentVoice();
+    setPhase("speaking");
+    await speakAgentReply(text, stateRef.current.lang);
+    setPhase("idle");
   }
 
   if (!open) return null;
+
+  const busy = phase === "processing" || phase === "speaking" || phase === "asking";
 
   return (
     <div className="fixed inset-0 z-[65] flex items-end justify-end sm:p-4">
@@ -191,68 +310,144 @@ export function WhatsAppAgent({
                     : "max-w-[85%] rounded-lg rounded-tl-sm bg-[#1f2c34] px-3 py-2 text-sm leading-relaxed text-[#e9edef]"
                 }
               >
-                {msg.voice && (
-                  <p className="mb-1 text-[11px] tracking-wide text-white/60 uppercase">
-                    {msg.role === "user" ? "Voice message" : "Voice reply"}
-                  </p>
-                )}
-                {msg.audioUrl ? (
-                  <audio controls src={msg.audioUrl} className="mb-1 max-w-full" preload="metadata" />
+                {msg.voice ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] tracking-wide text-white/60 uppercase">
+                      {msg.role === "user" ? "Voice message" : "Voice reply"}
+                    </span>
+                    {msg.role === "bot" ? (
+                      <button
+                        type="button"
+                        onClick={() => void replayBot(msg.text)}
+                        className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-1 text-[11px] text-white"
+                        aria-label="Play voice reply"
+                      >
+                        <Play className="size-3" /> Play
+                      </button>
+                    ) : null}
+                  </div>
                 ) : null}
-                {/* Voice user messages: don't dump transcript as main content */}
-                {msg.role === "user" && msg.voice ? null : (
-                  <p className="whitespace-pre-wrap">{msg.text}</p>
-                )}
+                {msg.audioUrl ? (
+                  <audio controls src={msg.audioUrl} className="mt-1 max-w-full" preload="metadata" />
+                ) : null}
+                {msg.voice ? null : <p className="whitespace-pre-wrap">{msg.text}</p>}
               </div>
             </div>
           ))}
-          {listening && (
-            <p className="text-center text-xs text-white/50">Listening… bolna shuru karein</p>
+
+          {denied && (
+            <div className="rounded-lg bg-[#1f2c34] px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap text-[#ffd7d7]">
+              {denied}
+            </div>
           )}
-          {speaking && (
-            <p className="text-center text-xs text-white/50">AI bol rahi hai…</p>
+
+          {phase === "asking" && <p className="text-center text-xs text-white/50">Microphone permission…</p>}
+          {phase === "recording" && (
+            <p className="text-center text-xs text-red-300">Recording {formatTimer(elapsed)} · Stop dabakar preview</p>
           )}
+          {phase === "processing" && <p className="text-center text-xs text-white/50">AI sun rahi hai…</p>}
+          {phase === "speaking" && <p className="text-center text-xs text-white/50">AI bol rahi hai…</p>}
         </div>
 
-        <form
-          className="flex items-end gap-2 bg-[#1f2c34] p-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            send(draft, false);
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => void toggleMic()}
-            aria-label={listening ? "Stop listening" : "Voice message"}
-            className={
-              listening
-                ? "grid size-11 shrink-0 place-items-center rounded-full bg-red-500 text-white"
-                : "grid size-11 shrink-0 place-items-center rounded-full bg-[#2a3942] text-white"
-            }
-          >
-            {listening ? <Square className="size-4" /> : <Mic className="size-5" />}
-          </button>
-          <textarea
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                send(draft, false);
-              }
+        {phase === "recording" || phase === "preview" ? (
+          <div className="border-t border-white/5 bg-[#1f2c34] px-3 py-3">
+            {phase === "recording" ? (
+              <div className="flex items-center gap-2">
+                <span className="size-2 animate-pulse rounded-full bg-red-500" />
+                <p className="flex-1 text-sm text-white">Recording {formatTimer(elapsed)}</p>
+                <button
+                  type="button"
+                  onClick={() => void stopRecord()}
+                  className="inline-flex h-10 items-center gap-1 rounded-lg bg-red-500 px-3 text-sm font-semibold text-white"
+                >
+                  <Square className="size-3.5" /> Stop
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelRecord}
+                  className="grid size-10 place-items-center rounded-lg bg-[#2a3942] text-white"
+                  aria-label="Cancel recording"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={togglePreviewPlay}
+                  className="grid size-10 place-items-center rounded-full bg-[#2a3942] text-white"
+                  aria-label={previewPlaying ? "Pause preview" : "Replay recording"}
+                >
+                  {previewPlaying ? <Pause className="size-4" /> : <Play className="size-4" />}
+                </button>
+                <p className="min-w-0 flex-1 text-xs text-white/70">Preview · send, retry, ya cancel</p>
+                <button
+                  type="button"
+                  onClick={() => void beginRecord()}
+                  className="grid size-10 place-items-center rounded-lg bg-[#2a3942] text-white"
+                  aria-label="New recording"
+                >
+                  <RotateCcw className="size-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelRecord}
+                  className="grid size-10 place-items-center rounded-lg bg-[#2a3942] text-white"
+                  aria-label="Cancel"
+                >
+                  <X className="size-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={sendPreview}
+                  className="inline-flex h-10 items-center gap-1 rounded-lg bg-[#25d366] px-3 text-sm font-semibold text-[#052e16]"
+                >
+                  <Send className="size-4" /> Send
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <form
+            className="flex items-end gap-2 bg-[#1f2c34] p-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (busy) return;
+              send(draft, false);
             }}
-            rows={1}
-            placeholder={listening ? "Listening…" : speaking ? "AI speaking…" : "Message"}
-            className="max-h-28 min-h-11 flex-1 resize-none rounded-lg bg-[#2a3942] px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/40"
-          />
-          <button
-            type="submit"
-            className="inline-flex h-11 shrink-0 items-center rounded-lg bg-[#25d366] px-4 text-sm font-semibold text-[#052e16]"
           >
-            Send
-          </button>
-        </form>
+            <button
+              type="button"
+              onClick={() => void beginRecord()}
+              disabled={busy}
+              aria-label="Voice message"
+              className="grid size-11 shrink-0 place-items-center rounded-full bg-[#2a3942] text-white disabled:opacity-50"
+            >
+              <Mic className="size-5" />
+            </button>
+            <textarea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  if (!busy) send(draft, false);
+                }
+              }}
+              rows={1}
+              placeholder={busy ? "AI busy…" : "Message"}
+              className="max-h-28 min-h-11 flex-1 resize-none rounded-lg bg-[#2a3942] px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/40"
+            />
+            <button
+              type="submit"
+              disabled={busy}
+              className="inline-flex h-11 shrink-0 items-center rounded-lg bg-[#25d366] px-4 text-sm font-semibold text-[#052e16] disabled:opacity-50"
+            >
+              Send
+            </button>
+          </form>
+        )}
       </section>
     </div>
   );
