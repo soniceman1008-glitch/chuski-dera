@@ -19,6 +19,7 @@ import {
   greet,
   initialAgentState,
   isVoiceUnclear,
+  type AgentLang,
   type AgentState,
 } from "@/lib/wa-agent";
 
@@ -33,6 +34,7 @@ type ChatMsg = {
   text: string;
   voice?: boolean;
   audioUrl?: string | null;
+  lang?: AgentLang;
 };
 
 function formatTimer(ms: number) {
@@ -73,7 +75,7 @@ export function WhatsAppAgent({
       const next = initialAgentState(customer);
       setState(next);
       const hello = greet("ru");
-      setMsgs([{ id: idRef.current++, role: "bot", text: hello, voice: true }]);
+      setMsgs([{ id: idRef.current++, role: "bot", text: hello, voice: true, lang: "ru" }]);
       setBooted(true);
       setPhase("speaking");
       void speakAgentReply(hello, "ru").finally(() => setPhase("idle"));
@@ -101,9 +103,15 @@ export function WhatsAppAgent({
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: "smooth" });
   }, [msgs, open, phase]);
 
-  function push(role: ChatMsg["role"], text: string, voice = false, audioUrl: string | null = null) {
+  function push(
+    role: ChatMsg["role"],
+    text: string,
+    voice = false,
+    audioUrl: string | null = null,
+    lang?: AgentLang,
+  ) {
     if (audioUrl) urlsRef.current.push(audioUrl);
-    setMsgs((m) => [...m, { id: idRef.current++, role, text, voice, audioUrl }]);
+    setMsgs((m) => [...m, { id: idRef.current++, role, text, voice, audioUrl, lang }]);
   }
 
   function send(text: string, viaVoice = false, audioUrl: string | null = null) {
@@ -111,11 +119,11 @@ export function WhatsAppAgent({
     if (!viaVoice && !value) return;
 
     if (viaVoice && isVoiceUnclear(value)) {
-      if (audioUrl) push("user", "", true, audioUrl);
+      if (audioUrl) push("user", "", true, audioUrl, stateRef.current.lang);
       const ask = clarifyLanguage(stateRef.current.lang);
       window.setTimeout(() => {
         void (async () => {
-          push("bot", ask, true);
+          push("bot", ask, true, null, stateRef.current.lang);
           setPhase("speaking");
           await speakAgentReply(ask, stateRef.current.lang);
           setPhase("idle");
@@ -127,7 +135,7 @@ export function WhatsAppAgent({
     if (!value) return;
 
     if (viaVoice) {
-      push("user", value, true, audioUrl);
+      push("user", value, true, audioUrl, stateRef.current.lang);
     } else {
       push("user", value, false);
     }
@@ -138,11 +146,9 @@ export function WhatsAppAgent({
     window.setTimeout(() => {
       void (async () => {
         for (const line of result.messages) {
-          push("bot", line, viaVoice);
-          if (viaVoice) {
-            setPhase("speaking");
-            await speakAgentReply(line, result.state.lang);
-          }
+          push("bot", line, viaVoice, null, result.state.lang);
+          setPhase("speaking");
+          await speakAgentReply(line, result.state.lang);
         }
         setPhase("idle");
         if (result.sendWhatsApp && result.state.lines.length) {
@@ -264,10 +270,10 @@ export function WhatsAppAgent({
     send(clip.transcript || "(voice)", true, clip.audioUrl);
   }
 
-  async function replayBot(text: string) {
+  async function replayBot(msg: ChatMsg) {
     stopAgentVoice();
     setPhase("speaking");
-    await speakAgentReply(text, stateRef.current.lang);
+    await speakAgentReply(msg.text, msg.lang ?? stateRef.current.lang);
     setPhase("idle");
   }
 
@@ -321,7 +327,7 @@ export function WhatsAppAgent({
                     {msg.role === "bot" ? (
                       <button
                         type="button"
-                        onClick={() => void replayBot(msg.text)}
+                        onClick={() => void replayBot(msg)}
                         className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-1 text-[11px] text-white"
                         aria-label="Play voice reply"
                       >
