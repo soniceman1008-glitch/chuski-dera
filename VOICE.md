@@ -74,3 +74,45 @@ To talk as staff again, turn forwarding **off**.
 ## Test without customers
 
 From any phone, call the **Twilio number** first. If the greeting plays, forwarding is the last step.
+
+## Web AI Agent voice (Option A + optional clone)
+
+Default is the **house voice family** (no personal clone):
+
+- Urdu / Roman Urdu: `ur-PK-UzmaNeural`
+- English: `en-IN-NeerjaNeural`
+- Hindi / Punjabi: `hi-IN-SwaraNeural`
+
+Replies stay audio-only. Language follows the latest customer utterance.
+
+### Optional: voice cloning (ElevenLabs)
+
+Clone is **off** until all three are true:
+
+1. Audio owner permission (`VOICE_CLONE_PERMISSION=true`)
+2. ElevenLabs API key
+3. A cloned voice id
+
+Steps:
+
+1. Open [https://elevenlabs.io](https://elevenlabs.io) and create an account (paid after trial).
+2. Profile → API key → copy the key. Do not paste it into GitHub or chat.
+3. Put a permitted staff recording at `public/audio/reference.ogg` (or any local path).
+4. Run:
+
+```bash
+VOICE_CLONE_PERMISSION=true ELEVENLABS_API_KEY=... node scripts/clone-voice.mjs public/audio/reference.ogg
+```
+
+5. Copy the printed `voice_id`.
+6. Vercel → Environment Variables → Production:
+
+| Key | Value |
+| --- | --- |
+| `VOICE_CLONE_PERMISSION` | `true` |
+| `ELEVENLABS_API_KEY` | from ElevenLabs |
+| `ELEVENLABS_VOICE_ID` | the cloned voice id |
+
+7. Redeploy.
+
+If any value is missing, the agent keeps the house voice. Check `/api/voice-clone-status` (no secrets are returned).

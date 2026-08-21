@@ -15,17 +15,51 @@ function voiceFor(lang) {
   return "en-IN-NeerjaNeural";
 }
 
+function cloneReady() {
+  return (
+    process.env.VOICE_CLONE_PERMISSION === "true" &&
+    Boolean(process.env.ELEVENLABS_API_KEY) &&
+    Boolean(process.env.ELEVENLABS_VOICE_ID)
+  );
+}
+
+/**
+ * Instant clone TTS. Only runs when owner permission + API key + voice id are set.
+ * @param {string} text
+ * @returns {Promise<Buffer | null>}
+ */
+async function synthesizeClonedSpeech(text) {
+  if (!cloneReady()) return null;
+  const voiceId = process.env.ELEVENLABS_VOICE_ID;
+  const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+    method: "POST",
+    headers: {
+      "xi-api-key": process.env.ELEVENLABS_API_KEY ?? "",
+      "Content-Type": "application/json",
+      Accept: "audio/mpeg",
+    },
+    body: JSON.stringify({
+      text,
+      model_id: "eleven_multilingual_v2",
+      voice_settings: {
+        stability: 0.42,
+        similarity_boost: 0.82,
+        style: 0.12,
+        use_speaker_boost: true,
+      },
+    }),
+  });
+  if (!res.ok) return null;
+  const buf = Buffer.from(await res.arrayBuffer());
+  return buf.length > 200 ? buf : null;
+}
+
 /**
  * @param {string} text
  * @param {string} [lang]
  * @returns {Promise<Buffer>}
  */
-export async function synthesizeAgentSpeech(text, lang = "ru") {
-  const clean = String(text ?? "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 700);
-  if (!clean) throw new Error("empty");
+async function synthesizeHouseSpeech(text, lang = "ru") {
   const voice = voiceFor(lang);
   const out = join(tmpdir(), `chuski-tts-${randomBytes(6).toString("hex")}.mp3`);
   const py = `
@@ -38,7 +72,7 @@ async def main():
 asyncio.run(main())
 `;
   await new Promise((resolve, reject) => {
-    const child = spawn("python3", ["-c", py, clean, voice, out], {
+    const child = spawn("python3", ["-c", py, text, voice, out], {
       stdio: ["ignore", "pipe", "pipe"],
     });
     let err = "";
@@ -60,4 +94,26 @@ asyncio.run(main())
   } finally {
     await unlink(out).catch(() => {});
   }
+}
+
+/**
+ * @param {string} text
+ * @param {string} [lang]
+ * @returns {Promise<Buffer>}
+ */
+export async function synthesizeAgentSpeech(text, lang = "ru") {
+  const clean = String(text ?? "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 700);
+  if (!clean) throw new Error("empty");
+
+  try {
+    const cloned = await synthesizeClonedSpeech(clean);
+    if (cloned) return cloned;
+  } catch {
+    /* house voice fallback */
+  }
+
+  return synthesizeHouseSpeech(clean, lang);
 }
