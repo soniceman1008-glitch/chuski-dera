@@ -1,4 +1,4 @@
-import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
+import { createRootRoute, HeadContent, Outlet, Scripts, useRouterState } from "@tanstack/react-router";
 import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import { SiteHeader } from "@/components/site-header";
@@ -6,6 +6,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { CartDrawer } from "@/components/cart-drawer";
 import { FloatActions } from "@/components/float-actions";
 import { VoicePrime } from "@/lib/choice-voice";
+import { CatalogProvider } from "@/lib/catalog-store";
 import appCss from "../styles.css?url";
 
 const APP_NAME = "Chuski Dera";
@@ -42,6 +43,9 @@ export const Route = createRootRoute({
 });
 
 function RootDocument() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const chrome = !pathname.startsWith("/admin") && pathname !== "/login";
+
   return (
     <html lang="en" className="antialiased" suppressHydrationWarning>
       <head>
@@ -51,13 +55,15 @@ function RootDocument() {
         <PreviewHostBridge />
         <VoicePrime />
         <AuthProvider>
-          <div className="flex min-h-dvh flex-col">
-            <SiteHeader />
-            <Outlet />
-            <SiteFooter />
-          </div>
-          <CartDrawer />
-          <FloatActions />
+          <CatalogProvider>
+            <div className="flex min-h-dvh flex-col">
+              {chrome && <SiteHeader />}
+              <Outlet />
+              {chrome && <SiteFooter />}
+            </div>
+            {chrome && <CartDrawer />}
+            {chrome && <FloatActions />}
+          </CatalogProvider>
         </AuthProvider>
         <Scripts />
       </body>
