@@ -65,7 +65,8 @@ export async function speakAgentReply(text: string, lang: AgentLang): Promise<vo
       u.onend = () => resolve();
       u.onerror = () => resolve();
       synth.speak(u);
-    };n    if (synth.getVoices().length === 0) {
+    };
+    if (synth.getVoices().length === 0) {
       synth.addEventListener("voiceschanged", () => speak(), { once: true });
       window.setTimeout(speak, 300);
     } else {
@@ -109,15 +110,13 @@ type Recog = {
 };
 
 export type VoiceCaptureResult = {
-  /** Transcript for the agent brain (not shown as plain chat if prefer audio UI). */
   transcript: string;
-  /** Recorded audio blob for playable voice bubble. */
   audioUrl: string | null;
 };
 
 /**
  * Record real audio + speech-to-text for understanding.
- * UI can show audio; agent uses transcript.
+ * UI shows audio; agent uses transcript.
  */
 export function startVoiceCapture(
   lang: AgentLang,
@@ -188,7 +187,6 @@ export function startVoiceCapture(
       (window as unknown as { webkitSpeechRecognition?: new () => Recog }).webkitSpeechRecognition;
 
     if (!Ctor) {
-      // Still allow pure recording; without STT agent can't understand
       window.setTimeout(() => {
         if (stopped) return;
         finish();
