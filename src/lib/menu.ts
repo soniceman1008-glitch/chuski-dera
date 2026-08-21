@@ -29,11 +29,11 @@ export const RESTAURANT = {
   tagline: "Crispy. Loaded. Delivered.",
   city: "Jhang",
   address: "Satellite Town B Block, Green Belt, Jhang",
-  phoneDisplay: "0313-9235645",
+  phoneDisplay: "+923139235645",
   phoneTel: "+923139235645",
-  callDisplay: "03717400624",
-  callTel: "+923717400624",
-  callHref: "tel:+923717400624",
+  callDisplay: "+923139235645",
+  callTel: "+923139235645",
+  callHref: "tel:+923139235645",
   mapsQuery: "Satellite Town B Block Green Belt Jhang Pakistan",
 } as const;
 
