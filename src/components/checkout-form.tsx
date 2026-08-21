@@ -7,6 +7,8 @@ import { QtyStepper } from "@/components/qty-stepper";
 import { OrderConfirmModal } from "@/components/order-confirm-modal";
 import { playOrderClip, stopOrderClip } from "@/lib/choice-voice";
 import { useHasMounted } from "@/lib/use-has-mounted";
+import { placeOrder } from "@/lib/server/orders";
+import { notifyOrdersChanged } from "@/lib/catalog-sync";
 
 export function CheckoutForm() {
   const mounted = useHasMounted();
@@ -72,6 +74,18 @@ export function CheckoutForm() {
     setWaReady(false);
     setWaOpened(false);
     setPhase("done");
+    void placeOrder({
+      data: {
+        name: snapshotCustomer.name,
+        phone: snapshotCustomer.phone,
+        address: snapshotCustomer.address,
+        lines: snapshotLines,
+      },
+    })
+      .then(() => notifyOrdersChanged())
+      .catch(() => {
+        /* WhatsApp ticket still goes out */
+      });
     playOrderClip("/audio/confirm-ok.mp3?v=thanks", () => {
       openWhatsApp();
     });

@@ -3,17 +3,20 @@ import { ArrowRight, MapPin, Phone, Bike } from "lucide-react";
 import { MenuGrid } from "@/components/menu-grid";
 import { FoodCard } from "@/components/food-card";
 import { CallLink } from "@/components/call-link";
-import { MENU, FOOD_CATEGORIES, RESTAURANT } from "@/lib/menu";
+import { FOOD_CATEGORIES, RESTAURANT } from "@/lib/menu";
 import { itemCount, useCart } from "@/lib/cart-store";
+import { useCatalog, useRestaurant } from "@/lib/catalog-store";
 import { useHasMounted } from "@/lib/use-has-mounted";
 
 export const Route = createFileRoute("/")({ component: Home });
 
 function Home() {
-  const featured = MENU.filter(
-    (item) => item.featured && FOOD_CATEGORIES.includes(item.category),
+  const shop = useRestaurant();
+  const { items: catalogItems } = useCatalog();
+  const featured = catalogItems.filter(
+    (item) => item.available && item.featured && FOOD_CATEGORIES.includes(item.category as (typeof FOOD_CATEGORIES)[number]),
   );
-  const promos = MENU.filter((item) => item.promo);
+  const promos = catalogItems.filter((item) => item.available && item.promo);
   const lines = useCart((s) => s.lines);
   const setDrawerOpen = useCart((s) => s.setDrawerOpen);
   const mounted = useHasMounted();
@@ -84,7 +87,7 @@ function Home() {
           <CallLink className="flex gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-primary/50">
             <Phone className="mt-0.5 size-5 text-primary" />
             <div>
-              <p className="font-medium">{RESTAURANT.callDisplay}</p>
+              <p className="font-medium">{shop.callDisplay}</p>
               <p className="mt-1 text-sm text-muted">Tap to call. One tap on your phone.</p>
             </div>
           </CallLink>
@@ -177,7 +180,7 @@ function Home() {
             <p className="mt-3 text-muted">{RESTAURANT.address}</p>
             <CallLink className="mt-6 inline-flex h-12 w-fit items-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-fg transition-transform duration-150 hover:bg-primary-hot active:scale-[0.96]">
               <Phone className="size-4" />
-              {RESTAURANT.callDisplay}
+              {shop.callDisplay}
             </CallLink>
             <Link
               to="/order"
