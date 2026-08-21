@@ -3,7 +3,7 @@ import { Phone } from "lucide-react";
 import { CallLink } from "@/components/call-link";
 import { useRestaurant } from "@/lib/catalog-store";
 
-const CALL_DISPLAY = "+923139235645";
+const CALL_DISPLAY = "03139235654";
 
 export function SiteFooter() {
   const shop = useRestaurant();
