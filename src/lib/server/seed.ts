@@ -1,17 +1,17 @@
 import type { Sql } from "@/lib/db";
 import { CATEGORIES, FOOD_CATEGORIES, MENU, RESTAURANT } from "@/lib/menu";
 
-const PHONE_DISPLAY = "+923139235645";
-const PHONE_TEL = "+923139235645";
+const CALL_DISPLAY = "03139235654";
+const CALL_TEL = "+923139235654";
+const WA_DISPLAY = "0313-9235645";
+const WA_TEL = "+923139235645";
 
 export async function seedIfEmpty(sql: Sql) {
   await sql`
     update settings
     set
-      call_display = ${PHONE_DISPLAY},
-      call_tel = ${PHONE_TEL},
-      wa_display = ${PHONE_DISPLAY},
-      wa_tel = ${PHONE_TEL},
+      call_display = ${CALL_DISPLAY},
+      call_tel = ${CALL_TEL},
       updated_at = now()
     where id = 'main'
   `;
@@ -31,10 +31,10 @@ export async function seedIfEmpty(sql: Sql) {
       ${RESTAURANT.address},
       ${RESTAURANT.city},
       ${"12:00 PM – 12:00 AM"},
-      ${PHONE_DISPLAY},
-      ${PHONE_TEL},
-      ${PHONE_DISPLAY},
-      ${PHONE_TEL},
+      ${CALL_DISPLAY},
+      ${CALL_TEL},
+      ${WA_DISPLAY},
+      ${WA_TEL},
       ${RESTAURANT.mapsQuery}
     )
     on conflict (id) do nothing
