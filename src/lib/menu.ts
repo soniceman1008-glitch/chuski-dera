@@ -1,4 +1,5 @@
 export type CategoryId =
+  | "deals"
   | "burgers"
   | "shawarma"
   | "wraps"
@@ -22,6 +23,7 @@ export type MenuItem = {
   image: string;
   featured?: boolean;
   promo?: boolean;
+  includes?: string[];
 };
 
 export const RESTAURANT = {
@@ -39,6 +41,7 @@ export const RESTAURANT = {
 
 export const CATEGORIES: { id: CategoryId | "all"; label: string }[] = [
   { id: "all", label: "All" },
+  { id: "deals", label: "Deals" },
   { id: "burgers", label: "Burgers" },
   { id: "shawarma", label: "Shawarma" },
   { id: "wraps", label: "Wraps & Rolls" },
@@ -114,7 +117,23 @@ export const MENU: MenuItem[] = [
   { id: "green-apple-soda", name: "Green Apple Italian Soda", blurb: "Green apple fizz.", price: 370, category: "soda", image: "/images/green-apple-soda.jpg" },
   { id: "blueberry-soda", name: "Blue Berry Italian Soda", blurb: "Berry soda, extra ice.", price: 370, category: "soda", image: "/images/blueberry-soda.jpg" },
   { id: "mint-margaretta", name: "Mint Margaretta", blurb: "Mint slush. The house cooler.", price: 200, category: "soda", image: "/images/mint-soda.jpg" },
+  { id: "deal-single", name: "Single Person Deal", blurb: "1 Zinger Burger + 1 Mint Margarita", price: 550, category: "deals", image: "/images/zinger-burger.jpg", includes: ["1 Zinger Burger", "1 Mint Margarita"] },
+  { id: "deal-gup-shup", name: "Gup Shup Deal", blurb: "3 Zinger Burgers + 3 Mint Margaritas", price: 1500, category: "deals", image: "/images/zinger-burger.jpg", includes: ["3 Zinger Burgers", "3 Mint Margaritas"] },
+  { id: "deal-couple", name: "Couple Deal", blurb: "2 Zinger Burgers + 10 Hot Wings + 2 Mint Margaritas", price: 1650, category: "deals", image: "/images/wings-10.jpg", includes: ["2 Zinger Burgers", "10 Hot Wings", "2 Mint Margaritas"] },
+  { id: "deal-younger", name: "Younger Deal", blurb: "10 Nuggets + 10 Hot Wings + 1 Litre Bottle", price: 1150, category: "deals", image: "/images/nuggets-10.jpg", includes: ["10 Nuggets", "10 Hot Wings", "1 Litre Bottle"] },
+  { id: "deal-family-1", name: "Family Deal 1", blurb: "5 Zinger Burgers + 1.5 Litre Bottle", price: 1900, category: "deals", image: "/images/zinger-burger.jpg", includes: ["5 Zinger Burgers", "1.5 Litre Bottle"] },
+  { id: "deal-family-2", name: "Family Deal 2", blurb: "2 Zinger Burgers + 3 Grilled Wraps + 1.5 Litre Bottle", price: 2400, category: "deals", image: "/images/grilled-wrap.jpg", includes: ["2 Zinger Burgers", "3 Grilled Wraps", "1.5 Litre Bottle"] },
+  { id: "deal-shawarma-special", name: "Shawarma Special Deal", blurb: "5 Zinger Shawarmas + 1 Litre Bottle", price: 1500, category: "deals", image: "/images/zinger-shawarma.jpg", includes: ["5 Zinger Shawarmas", "1 Litre Bottle"] },
+  { id: "deal-super-saver", name: "Super Saver Deal", blurb: "3 Zinger Shawarmas + 2 Nugget Shawarmas + 1 Litre Bottle", price: 1400, category: "deals", image: "/images/nuggets-shawarma.jpg", includes: ["3 Zinger Shawarmas", "2 Nugget Shawarmas", "1 Litre Bottle"] },
+  { id: "deal-mega-family", name: "Mega Family Deal", blurb: "2 Double Beef + 2 Tower + 2 Zinger + 2 Zinger Shawarma + 2 Nugget Shawarma + Jumbo Bottle", price: 3990, category: "deals", image: "/images/double-burger.jpg", includes: ["2 Double Beef Burgers", "2 Tower Burgers", "2 Zinger Burgers", "2 Zinger Shawarmas", "2 Nugget Shawarmas", "1 Jumbo Bottle"] },
 ];
+
+export function dealIncludes(item: { id: string; blurb?: string; includes?: string[] }) {
+  if (item.includes?.length) return item.includes;
+  const fromMenu = MENU.find((row) => row.id === item.id)?.includes;
+  if (fromMenu?.length) return fromMenu;
+  return (item.blurb ?? "").split(/\s*\+\s*|\n/).map((line) => line.trim()).filter(Boolean);
+}
 
 export function formatRs(amount: number) {
   return `Rs. ${amount.toLocaleString("en-PK")}`;
