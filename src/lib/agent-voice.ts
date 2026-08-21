@@ -30,7 +30,7 @@ function pickVoice(lang: VoiceLang): SpeechSynthesisVoice | null {
   const synth = window.speechSynthesis;
   if (!synth) return null;
   const voices = synth.getVoices();
-  if (lang === "ur") {
+  if (lang === "ur" || lang === "ru") {
     return (
       voices.find((v) => /ur/i.test(v.lang)) ??
       voices.find((v) => /pakistan|urdu/i.test(`${v.name} ${v.lang}`)) ??
@@ -38,10 +38,7 @@ function pickVoice(lang: VoiceLang): SpeechSynthesisVoice | null {
     );
   }
   if (lang === "hi") {
-    return (
-      voices.find((v) => /hi-IN|hindi/i.test(`${v.name} ${v.lang}`)) ??
-      southAsian(voices)
-    );
+    return voices.find((v) => /hi-IN|hindi/i.test(`${v.name} ${v.lang}`)) ?? southAsian(voices);
   }
   if (lang === "pa") {
     return (
@@ -51,15 +48,8 @@ function pickVoice(lang: VoiceLang): SpeechSynthesisVoice | null {
       southAsian(voices)
     );
   }
-  if (lang === "ru") {
-    return (
-      voices.find((v) => /en-IN|india/i.test(`${v.name} ${v.lang}`)) ??
-      voices.find((v) => /ur/i.test(v.lang)) ??
-      southAsian(voices)
-    );
-  }
   return (
-    voices.find((v) => /en-GB|en-US/i.test(v.lang) && /female|samantha|zira|sonia|google uk english female/i.test(v.name)) ??
+    voices.find((v) => /en-IN|india/i.test(`${v.name} ${v.lang}`)) ??
     voices.find((v) => /^en/i.test(v.lang)) ??
     null
   );
@@ -69,18 +59,27 @@ function ttsLang(lang: VoiceLang) {
   if (lang === "ur") return "ur-PK";
   if (lang === "hi") return "hi-IN";
   if (lang === "pa") return "pa-IN";
-  if (lang === "ru") return "en-IN";
-  return "en-GB";
+  if (lang === "ru") return "ur-PK";
+  return "en-IN";
 }
 
-/** Speak AI reply in the sender's latest language (audio only). */
-export async function speakAgentReply(text: string, lang: VoiceLang): Promise<void> {
-  if (typeof window === "undefined") return;
+async function playBlobUrl(url: string) {
   stopAgentVoice();
-  const script = voiceScript(text);
+  const a = new Audio(url);
+  a.setAttribute("playsinline", "true");
+  a.preload = "auto";
+  current = a;
+  await new Promise<void>((resolve) => {
+    const done = () => resolve();
+    a.addEventListener("ended", done, { once: true });
+    a.addEventListener("error", done, { once: true });
+    void a.play().catch(() => resolve());
+  });
+}
+
+async function speakBrowser(script: string, lang: VoiceLang) {
   const synth = window.speechSynthesis;
   if (!synth) return;
-
   await new Promise<void>((resolve) => {
     let done = false;
     const finish = () => {
@@ -91,8 +90,8 @@ export async function speakAgentReply(text: string, lang: VoiceLang): Promise<vo
     const speak = () => {
       synth.cancel();
       const u = new SpeechSynthesisUtterance(script);
-      u.rate = lang === "en" ? 0.95 : 0.9;
-      u.pitch = 1.02;
+      u.rate = 0.9;
+      u.pitch = 1;
       u.volume = 1;
       u.lang = ttsLang(lang);
       const pick = pickVoice(lang);
@@ -109,6 +108,32 @@ export async function speakAgentReply(text: string, lang: VoiceLang): Promise<vo
       speak();
     }
   });
+}
+
+/** Speak AI reply. Prefers house-voice MP3, then browser TTS. Returns playable URL if any. */
+export async function speakAgentReply(text: string, lang: VoiceLang): Promise<string | null> {
+  if (typeof window === "undefined") return null;
+  stopAgentVoice();
+  const script = voiceScript(text);
+  try {
+    const res = await fetch("/api/agent-tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: script, lang }),
+    });
+    if (res.ok) {
+      const blob = await res.blob();
+      if (blob.size > 200) {
+        const url = URL.createObjectURL(blob);
+        await playBlobUrl(url);
+        return url;
+      }
+    }
+  } catch {
+    /* browser fallback */
+  }
+  await speakBrowser(script, lang);
+  return null;
 }
 
 export function permissionHelp(): string {
@@ -196,16 +221,14 @@ export type VoiceSession = {
 };
 
 function bestTranscript(parts: string[]) {
-  return parts
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .sort((a, b) => b.length - a.length)[0] ?? "";
+  return (
+    parts
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .sort((a, b) => b.length - a.length)[0] ?? ""
+  );
 }
 
-/**
- * Manual record session. SpeechRecognition runs in a few languages so the
- * latest utterance can switch Urdu / English / Punjabi / Hindi.
- */
 export function createVoiceSession(lang: VoiceLang): VoiceSession {
   let stream: MediaStream | null = null;
   let recorder: MediaRecorder | null = null;
