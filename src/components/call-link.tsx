@@ -1,8 +1,8 @@
 import type { AnchorHTMLAttributes, ReactNode } from "react";
 
 /** Only number allowed for the phone/call icon dialer. */
-const CALL_TEL = "+923139235645";
-const CALL_DISPLAY = "+923139235645";
+const CALL_TEL = "+923139235654";
+const CALL_DISPLAY = "03139235654";
 const CALL_HREF = `tel:${CALL_TEL}`;
 
 export function CallLink({
