@@ -1,4 +1,5 @@
 import type { VoiceLang } from "./voice-lang";
+import { nlpClean, nlpSpeakable, pickAsrTranscript } from "./nlp";
 
 let current: HTMLAudioElement | null = null;
 
@@ -13,9 +14,9 @@ export function stopAgentVoice() {
 }
 
 export function voiceScript(text: string) {
-  const trimmed = text.trim();
-  if (trimmed.length <= 220) return trimmed;
-  const first = trimmed.split("\n")[0] ?? trimmed;
+  const spoken = nlpSpeakable(text) || text.trim();
+  if (spoken.length <= 220) return spoken;
+  const first = spoken.split("\n")[0] ?? spoken;
   return `${first.slice(0, 200)}.`;
 }
 
@@ -81,8 +82,8 @@ async function speakBrowser(script: string, lang: VoiceLang) {
     const speak = () => {
       synth.cancel();
       const u = new SpeechSynthesisUtterance(script);
-      u.rate = lang === "ur" ? 0.9 : 0.95;
-      u.pitch = 1.05;
+      u.rate = 0.82;
+      u.pitch = 1.02;
       u.volume = 1;
       u.lang = ttsLang(lang);
       const pick = pickVoice(lang);
@@ -101,7 +102,6 @@ async function speakBrowser(script: string, lang: VoiceLang) {
   });
 }
 
-/** Speak immediately with on-device female TTS. Skip slow server synthesis. */
 export async function speakAgentReply(text: string, lang: VoiceLang): Promise<string | null> {
   if (typeof window === "undefined") return null;
   stopAgentVoice();
@@ -151,7 +151,9 @@ type Recog = {
   interimResults: boolean;
   continuous: boolean;
   maxAlternatives: number;
-  onresult: ((ev: { results: ArrayLike<{ 0: { transcript: string }; isFinal?: boolean }> }) => void) | null;
+  onresult: ((ev: {
+    results: ArrayLike<{ isFinal?: boolean; length: number; [i: number]: { transcript: string; confidence?: number } }>;
+  }) => void) | null;
   onerror: ((ev: { error: string }) => void) | null;
   onend: (() => void) | null;
   start: () => void;
@@ -166,17 +168,12 @@ export type VoiceCaptureResult = {
   durationMs: number;
 };
 
-function pickMime(): string {
-  if (typeof MediaRecorder === "undefined") return "";
-  const types = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"];
-  return types.find((t) => MediaRecorder.isTypeSupported(t)) ?? "";
-}
-
 function recogLangs(hint: VoiceLang): string[] {
-  const primary =
-    hint === "ur" ? "ur-PK" : hint === "pa" ? "pa-IN" : hint === "hi" ? "hi-IN" : hint === "ru" ? "en-IN" : "en-US";
-  const extras = ["en-IN", "ur-PK", "hi-IN", "pa-IN", "en-US"];
-  return [primary, ...extras.filter((x) => x !== primary)];
+  if (hint === "en") return ["en-IN"];
+  if (hint === "hi") return ["hi-IN"];
+  if (hint === "pa") return ["pa-IN"];
+  if (hint === "ur") return ["ur-PK"];
+  return ["en-IN"];
 }
 
 function speechCtor(): (new () => Recog) | null {
@@ -194,19 +191,11 @@ export type VoiceSession = {
 };
 
 function bestTranscript(parts: string[]) {
-  return (
-    parts
-      .map((s) => s.trim())
-      .filter(Boolean)
-      .sort((a, b) => b.length - a.length)[0] ?? ""
-  );
+  return nlpClean(pickAsrTranscript(parts));
 }
 
 export function createVoiceSession(lang: VoiceLang): VoiceSession {
-  let stream: MediaStream | null = null;
-  let recorder: MediaRecorder | null = null;
   const recogs: Recog[] = [];
-  const chunks: BlobPart[] = [];
   const transcripts: string[] = [];
   let startedAt = 0;
   let stopped = false;
@@ -220,13 +209,6 @@ export function createVoiceSession(lang: VoiceLang): VoiceSession {
       }
     }
     recogs.length = 0;
-    try {
-      if (recorder && recorder.state !== "inactive") recorder.stop();
-    } catch {
-      /* */
-    }
-    stream?.getTracks().forEach((t) => t.stop());
-    stream = null;
   };
 
   const startOne = (code: string) => {
@@ -236,18 +218,21 @@ export function createVoiceSession(lang: VoiceLang): VoiceSession {
       const recog = new Ctor();
       recog.lang = code;
       recog.interimResults = true;
-      recog.continuous = true;
-      recog.maxAlternatives = 1;
+      recog.continuous = false;
+      recog.maxAlternatives = 5;
       recog.onresult = (ev) => {
-        const parts: string[] = [];
         for (let i = 0; i < ev.results.length; i++) {
-          const bit = ev.results[i]?.[0]?.transcript?.trim();
-          if (bit) parts.push(bit);
+          const row = ev.results[i];
+          if (!row) continue;
+          const altCount = typeof row.length === "number" ? row.length : 1;
+          for (let a = 0; a < altCount; a++) {
+            const alt = row[a]?.transcript?.trim();
+            if (alt) transcripts.push(alt);
+          }
         }
-        if (parts.length) transcripts.push(parts.join(" "));
       };
       recog.onerror = () => {
-        /* keep recording */
+        /* wait for stop */
       };
       recog.onend = () => {
         if (stopped) return;
@@ -260,28 +245,19 @@ export function createVoiceSession(lang: VoiceLang): VoiceSession {
       recog.start();
       recogs.push(recog);
     } catch {
-      /* one engine is enough */
+      /* */
     }
   };
 
   return {
     async start() {
       stopped = false;
-      chunks.length = 0;
       transcripts.length = 0;
-      stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true },
-      });
-      const mime = pickMime();
-      recorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunks.push(e.data);
-      };
-      recorder.start(250);
+      if (!speechCtor()) {
+        throw new Error("Is browser mein voice recognition nahi hai. Chrome use karein.");
+      }
       startedAt = Date.now();
-      const langs = recogLangs(lang);
-      startOne(langs[0] ?? "en-IN");
-      if (langs[1]) startOne(langs[1]);
+      startOne(recogLangs(lang)[0] ?? "en-IN");
     },
 
     stop() {
@@ -299,42 +275,21 @@ export function createVoiceSession(lang: VoiceLang): VoiceSession {
             /* */
           }
         }
-        const finish = () => {
-          stream?.getTracks().forEach((t) => t.stop());
-          stream = null;
+        window.setTimeout(() => {
           recogs.length = 0;
-          let audioBlob: Blob | null = null;
-          let audioUrl: string | null = null;
-          if (chunks.length) {
-            audioBlob = new Blob(chunks, { type: recorder?.mimeType || "audio/webm" });
-            audioUrl = URL.createObjectURL(audioBlob);
-          }
           resolve({
             transcript: bestTranscript(transcripts),
-            audioUrl,
-            audioBlob,
+            audioUrl: null,
+            audioBlob: null,
             durationMs,
           });
-        };
-        window.setTimeout(() => {
-          if (recorder && recorder.state !== "inactive") {
-            recorder.onstop = finish;
-            try {
-              recorder.stop();
-            } catch {
-              finish();
-            }
-          } else {
-            finish();
-          }
-        }, 180);
+        }, 350);
       });
     },
 
     cancel() {
       stopped = true;
       tearDown();
-      chunks.length = 0;
       transcripts.length = 0;
     },
   };
