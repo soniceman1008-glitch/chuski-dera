@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { deleteMenuItem, getAdminCatalog, saveMenuItem } from "@/lib/server/catalog";
+import { deleteFileMenuItem as deleteMenuItem, getFileAdminCatalog as getAdminCatalog, saveFileMenuItem as saveMenuItem } from "@/lib/server/file-catalog";
 import { formatRs } from "@/lib/menu";
 import { notifyCatalogChanged } from "@/lib/catalog-sync";
 import { useCatalog } from "@/lib/catalog-store";
