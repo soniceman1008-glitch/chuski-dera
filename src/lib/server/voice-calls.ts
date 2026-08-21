@@ -19,16 +19,12 @@ export const getVoiceDashboard = createServerFn({ method: "GET" })
         address, notes, cart_json, order_id, started_at, ended_at, duration_sec, last_speech
       from call_sessions order by started_at desc limit 40
     `;
-    const ids = calls.map((c) => String(c.id));
-    const turns =
-      ids.length === 0
-        ? []
-        : await sql.query<Record<string, unknown>>(
-            `select call_id, role, text, created_at from call_turns where call_id = any($1::text[]) order by id`,
-            [ids],
-          );
+    const turns = await sql<Record<string, unknown>>`
+      select call_id, role, text, created_at from call_turns
+      order by id desc limit 400
+    `;
     const byCall = new Map<string, { role: string; text: string; at: string }[]>();
-    for (const t of turns) {
+    for (const t of [...turns].reverse()) {
       const id = String(t.call_id);
       const list = byCall.get(id) ?? [];
       list.push({ role: String(t.role), text: String(t.text), at: String(t.created_at) });
