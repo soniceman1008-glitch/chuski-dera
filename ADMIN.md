@@ -15,11 +15,16 @@ Do this once. Do not paste the connection string into GitHub, chat, or the websi
 ## 2. Put it on Vercel (secret)
 
 1. Open [https://vercel.com/tayyab-mehmood/chuski-dera/settings/environment-variables](https://vercel.com/tayyab-mehmood/chuski-dera/settings/environment-variables)
-2. Key: `DATABASE_URL`
-3. Value: the Neon string (paste once, never share it)
-4. Environments: **Production** (and Preview if you want)
-5. Save.
-6. Deployments → latest → **Redeploy** (or wait for the next git deploy).
+2. Add these three keys. Environments: **Production** (and Preview if you want). Never share the values.
+
+   | Key | Value |
+   | --- | --- |
+   | `DATABASE_URL` | Neon connection string from step 1 |
+   | `BETTER_AUTH_URL` | `https://chuski-dera.vercel.app` |
+   | `BETTER_AUTH_SECRET` | any long random string (32+ characters) |
+
+3. Save.
+4. Deployments → latest → **Redeploy** (or wait for the next git deploy).
 
 After redeploy the first request creates tables and seeds the menu.
 
