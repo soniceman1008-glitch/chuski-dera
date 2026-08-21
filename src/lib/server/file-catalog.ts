@@ -1,3 +1,5 @@
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
 import { CATEGORIES, FOOD_CATEGORIES, MENU, RESTAURANT } from "@/lib/menu";
 import type { CatalogCategory, CatalogItem, RestaurantSettings } from "@/lib/types";
 
@@ -96,3 +98,27 @@ export function fileDeleteItem(id: string) {
   if (idx >= 0) items.splice(idx, 1);
   return { ok: true };
 }
+
+export const getFileAdminCatalog = createServerFn({ method: "GET" }).handler(async () => fileCatalog(true));
+
+export const saveFileMenuItem = createServerFn({ method: "POST" })
+  .validator((d: unknown) =>
+    z
+      .object({
+        id: z.string().min(1).max(80).optional(),
+        name: z.string().min(1).max(80),
+        blurb: z.string().max(200).optional().default(""),
+        price: z.number().int().min(0).max(100000),
+        category: z.string().min(1).max(80),
+        image: z.string().max(2_000_000).optional().default(""),
+        featured: z.boolean().optional().default(false),
+        promo: z.boolean().optional().default(false),
+        available: z.boolean().optional().default(true),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data }) => fileSaveItem(data));
+
+export const deleteFileMenuItem = createServerFn({ method: "POST" })
+  .validator((d: unknown) => z.object({ id: z.string().min(1) }).parse(d))
+  .handler(async ({ data }) => fileDeleteItem(data.id));
