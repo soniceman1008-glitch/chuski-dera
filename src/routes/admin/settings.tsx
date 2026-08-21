@@ -60,7 +60,7 @@ function SettingsAdmin() {
         {field("city", "City")}
         {field("hours", "Hours")}
         {field("callDisplay", "Call display")}
-        {field("callTel", "Call tel (e.g. +923139235645)")}
+        {field("callTel", "Call tel (e.g. +923139235654)")}
         {field("waDisplay", "WhatsApp display")}
         {field("waTel", "WhatsApp tel")}
         {field("mapsQuery", "Maps query")}
