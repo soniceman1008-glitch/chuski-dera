@@ -2,7 +2,8 @@ import { findItem, formatRs, RESTAURANT } from "./menu";
 import type { CartLine, Customer } from "./cart-store";
 import { cartTotal } from "./cart-store";
 
-const WA_NUMBER = RESTAURANT.phoneTel.replace("+", "");
+/** Always international format for wa.me links. */
+const WA_NUMBER = "923139235654";
 const TZ = "Asia/Karachi";
 
 function stamp(now = new Date()) {

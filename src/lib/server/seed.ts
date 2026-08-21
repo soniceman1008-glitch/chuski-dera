@@ -1,12 +1,14 @@
 import type { Sql } from "@/lib/db";
 import { CATEGORIES, FOOD_CATEGORIES, MENU, RESTAURANT } from "@/lib/menu";
 
+/** Canonical contact numbers — forced on every seedIfEmpty call. */
 const CALL_DISPLAY = "0313-9235654";
 const CALL_TEL = "+923139235654";
 const WA_DISPLAY = "0313-9235654";
 const WA_TEL = "+923139235654";
 
 export async function seedIfEmpty(sql: Sql) {
+  // Always correct phone fields so DB never keeps 0313-9235645 / wrong last digits.
   await sql`
     update settings
     set

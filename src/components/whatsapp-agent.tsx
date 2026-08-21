@@ -22,6 +22,9 @@ import {
   type AgentState,
 } from "@/lib/wa-agent";
 
+/** Web AI Agent header — always show this local number (never stale bundle value). */
+const AGENT_PHONE_DISPLAY = "0313-9235654";
+
 type VoicePhase = "idle" | "asking" | "recording" | "preview" | "processing" | "speaking";
 
 type ChatMsg = {
@@ -277,7 +280,7 @@ export function WhatsAppAgent({
       <button type="button" className="absolute inset-0 bg-bg/50 sm:bg-bg/40" aria-label="Close chat" onClick={onClose} />
       <section
         role="dialog"
-        aria-label="Chuski Dera WhatsApp"
+        aria-label="Chuski Dera AI Agent"
         className="relative flex h-[min(100dvh,40rem)] w-full max-w-md flex-col overflow-hidden bg-[#0b141a] shadow-[var(--shadow-card)] sm:h-[min(90dvh,40rem)] sm:rounded-xl"
       >
         <header className="flex items-center gap-3 bg-[#075e54] px-3 py-2.5 text-white">
@@ -287,14 +290,14 @@ export function WhatsAppAgent({
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold">{RESTAURANT.name}</p>
             <p className="truncate text-xs text-white/80">
-              {RESTAURANT.phoneDisplay} · AI · voice & text
+              {AGENT_PHONE_DISPLAY} · AI · text & voice
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
             className="grid size-11 place-items-center rounded-full hover:bg-white/10"
-            aria-label="Close WhatsApp"
+            aria-label="Close chat"
           >
             <X className="size-5" />
           </button>
