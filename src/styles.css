@@ -1,0 +1,109 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "DM Sans", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Bebas Neue", "Oswald", "Impact", sans-serif;
+
+  --color-bg: #0b0b0b;
+  --color-surface: #141414;
+  --color-elevated: #1c1c1c;
+  --color-fg: #fffdf6;
+  --color-muted: #a8a29a;
+  --color-subtle: #6f6b64;
+  --color-primary: #f5c400;
+  --color-primary-hot: #ffd21f;
+  --color-primary-fg: #0b0b0b;
+  --color-border: color-mix(in oklab, var(--color-fg) 12%, transparent);
+  --color-whatsapp: #25d366;
+  --color-whatsapp-hot: #1ebe5d;
+  --color-whatsapp-fg: #f7fffd;
+
+  --shadow-card: 0 0 0 1px color-mix(in oklab, var(--color-fg) 8%, transparent),
+    0 12px 32px -12px rgb(0 0 0 / 0.65);
+
+  --ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --motion-micro: 80ms;
+  --motion-quick: 0.15s;
+  --motion-fast: 0.25s;
+  --motion-slow: 0.4s;
+
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  html,
+  body {
+    min-height: 100dvh;
+    background: var(--color-bg);
+    color: var(--color-fg);
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: 0.02em;
+}
+
+.stagger-in > * {
+  animation: rise-in var(--motion-slow) var(--ease-smooth-out) both;
+}
+.stagger-in > :first-child {
+  animation-delay: 40ms;
+}
+.stagger-in > :nth-child(2) {
+  animation-delay: 0.1s;
+}
+.stagger-in > :nth-child(3) {
+  animation-delay: 0.16s;
+}
+.stagger-in > :nth-child(4) {
+  animation-delay: 0.22s;
+}
+
+@keyframes rise-in {
+  0% {
+    opacity: 0;
+    filter: blur(3px);
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0);
+  }
+}
