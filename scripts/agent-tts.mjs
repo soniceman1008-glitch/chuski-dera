@@ -4,26 +4,36 @@ import { readFile, unlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+/** One restaurant-friendly female house voice family. */
+function voiceFor(lang) {
+  const key = String(lang || "ru").toLowerCase();
+  if (key === "ur") return "ur-PK-UzmaNeural";
+  if (key === "hi") return "hi-IN-SwaraNeural";
+  if (key === "pa") return "hi-IN-SwaraNeural";
+  if (key === "ru") return "ur-PK-UzmaNeural";
+  if (key === "en") return "en-IN-NeerjaNeural";
+  return "en-IN-NeerjaNeural";
+}
+
 /**
  * @param {string} text
  * @param {string} [lang]
  * @returns {Promise<Buffer>}
  */
-export async function synthesizeAgentSpeech(text, lang = "en") {
+export async function synthesizeAgentSpeech(text, lang = "ru") {
   const clean = String(text ?? "")
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 700);
   if (!clean) throw new Error("empty");
-  const voice =
-    lang === "ur" ? "ur-IN-GulNeural" : lang === "ru" ? "en-IN-NeerjaNeural" : "en-GB-SoniaNeural";
+  const voice = voiceFor(lang);
   const out = join(tmpdir(), `chuski-tts-${randomBytes(6).toString("hex")}.mp3`);
   const py = `
 import asyncio, sys
 from edge_tts import Communicate
 text, voice, path = sys.argv[1], sys.argv[2], sys.argv[3]
 async def main():
-    c = Communicate(text=text, voice=voice, rate="-14%", pitch="-1Hz")
+    c = Communicate(text=text, voice=voice, rate="-12%", pitch="-2Hz")
     await c.save(path)
 asyncio.run(main())
 `;
