@@ -3,6 +3,8 @@ import { Phone } from "lucide-react";
 import { CallLink } from "@/components/call-link";
 import { useRestaurant } from "@/lib/catalog-store";
 
+const CALL_DISPLAY = "+923139235645";
+
 export function SiteFooter() {
   const shop = useRestaurant();
   return (
@@ -21,7 +23,7 @@ export function SiteFooter() {
           {shop.hours ? <p className="mt-1 text-xs text-subtle">{shop.hours}</p> : null}
           <CallLink className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary-hot">
             <Phone className="size-4" />
-            {shop.callDisplay}
+            {CALL_DISPLAY}
           </CallLink>
         </div>
         <div>
