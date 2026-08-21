@@ -10,6 +10,7 @@ export const Route = createFileRoute("/admin")({ component: AdminGate });
 function AdminGate() {
   const { user, isPending } = useCurrentUserState();
   const [staff, setStaff] = useState<"load" | "yes" | "no">("load");
+  const [waited, setWaited] = useState(false);
 
   useEffect(() => {
     if (isPending) return;
@@ -30,7 +31,12 @@ function AdminGate() {
     };
   }, [user?.id, isPending]);
 
-  if (isPending) {
+  useEffect(() => {
+    const id = window.setTimeout(() => setWaited(true), 4000);
+    return () => window.clearTimeout(id);
+  }, []);
+
+  if (isPending && !waited) {
     return <div className="grid min-h-dvh place-items-center text-sm text-muted">Loading…</div>;
   }
   if (!user) return <AdminLoginCard />;
