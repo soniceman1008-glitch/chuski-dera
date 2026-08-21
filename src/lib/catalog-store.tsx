@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { CATEGORIES, FOOD_CATEGORIES, MENU, RESTAURANT, setLiveMenu } from "@/lib/menu";
+import { CATEGORIES, FOOD_CATEGORIES, MENU, RESTAURANT } from "@/lib/menu";
 import { getPublicCatalog } from "@/lib/server/catalog";
 import { subscribeCatalogSync } from "@/lib/catalog-sync";
 import type { CatalogCategory, CatalogItem, RestaurantSettings } from "@/lib/types";
@@ -85,7 +85,6 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
         setSettings(data.settings);
         setCategories(data.categories);
         setItems(data.items);
-        setLiveMenu(data.items);
         setReady(true);
       })
       .catch(() => {
