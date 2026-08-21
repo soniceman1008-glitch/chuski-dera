@@ -16,7 +16,7 @@ export function voiceScript(text: string) {
   const trimmed = text.trim();
   if (trimmed.length <= 320) return trimmed;
   const first = trimmed.split("\n")[0] ?? trimmed;
-  return `${first.slice(0, 280)}. Details are in the chat.`;
+  return `${first.slice(0, 280)}.`;
 }
 
 function pickVoice(lang: AgentLang): SpeechSynthesisVoice | null {
@@ -27,13 +27,24 @@ function pickVoice(lang: AgentLang): SpeechSynthesisVoice | null {
     return (
       voices.find((v) => /ur/i.test(v.lang)) ??
       voices.find((v) => /pakistan|urdu/i.test(`${v.name} ${v.lang}`)) ??
+      voices.find((v) => /hi-IN|hindi/i.test(`${v.name} ${v.lang}`)) ??
+      null
+    );
+  }
+  if (lang === "pa") {
+    return (
+      voices.find((v) => /pa/i.test(v.lang)) ??
+      voices.find((v) => /punjabi/i.test(`${v.name} ${v.lang}`)) ??
+      voices.find((v) => /hi-IN|hindi/i.test(`${v.name} ${v.lang}`)) ??
+      voices.find((v) => /ur/i.test(v.lang)) ??
       null
     );
   }
   if (lang === "ru") {
     return (
       voices.find((v) => /en-IN|india/i.test(`${v.name} ${v.lang}`)) ??
-      voices.find((v) => /en-GB|english/i.test(v.lang) && /female|samantha|zira|sonia/i.test(v.name)) ??
+      voices.find((v) => /ur/i.test(v.lang)) ??
+      voices.find((v) => /en-GB/i.test(v.lang) && /female|samantha|zira|sonia/i.test(v.name)) ??
       null
     );
   }
@@ -42,6 +53,13 @@ function pickVoice(lang: AgentLang): SpeechSynthesisVoice | null {
     voices.find((v) => /^en/i.test(v.lang)) ??
     null
   );
+}
+
+function ttsLang(lang: AgentLang) {
+  if (lang === "ur") return "ur-PK";
+  if (lang === "pa") return "hi-IN";
+  if (lang === "ru") return "en-IN";
+  return "en-GB";
 }
 
 /** Speak AI reply in the sender's language (audio only path). */
@@ -56,10 +74,10 @@ export async function speakAgentReply(text: string, lang: AgentLang): Promise<vo
     const speak = () => {
       synth.cancel();
       const u = new SpeechSynthesisUtterance(script);
-      u.rate = 0.9;
-      u.pitch = 1;
+      u.rate = 0.92;
+      u.pitch = 1.02;
       u.volume = 1;
-      u.lang = lang === "ur" ? "ur-PK" : lang === "ru" ? "en-IN" : "en-GB";
+      u.lang = ttsLang(lang);
       const pick = pickVoice(lang);
       if (pick) u.voice = pick;
       u.onend = () => resolve();
@@ -75,24 +93,41 @@ export async function speakAgentReply(text: string, lang: AgentLang): Promise<vo
   });
 }
 
+export function permissionHelp(): string {
+  return [
+    "Microphone allow nahi hua.",
+    "Chrome/Edge: address bar ke lock/tune icon → Site settings → Microphone → Allow.",
+    "Safari iPhone: Settings → Safari → Microphone → Allow, phir page refresh karein.",
+    "Android Chrome: site ke ⋮ menu → Permissions → Microphone.",
+  ].join("\n");
+}
+
 /** Ask for microphone permission explicitly. */
 export async function requestMicPermission(): Promise<{ ok: boolean; error?: string }> {
   if (typeof window === "undefined" || !navigator.mediaDevices?.getUserMedia) {
-    return { ok: false, error: "Microphone is not supported on this browser." };
+    return { ok: false, error: "Is browser mein microphone support nahi hai. Chrome use karein." };
   }
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true },
+    });
     stream.getTracks().forEach((t) => t.stop());
     return { ok: true };
   } catch (err) {
     const name = err instanceof DOMException ? err.name : "";
     if (name === "NotAllowedError" || name === "PermissionDeniedError") {
-      return { ok: false, error: "Mic permission blocked. Browser settings se allow karein." };
+      return { ok: false, error: permissionHelp() };
     }
     if (name === "NotFoundError") {
-      return { ok: false, error: "Koi microphone nahi mila." };
+      return { ok: false, error: "Koi microphone nahi mila. Headset ya phone mic check karein." };
     }
-    return { ok: false, error: "Microphone open nahi ho saka." };
+    if (name === "NotReadableError") {
+      return { ok: false, error: "Microphone kisi aur app mein busy hai. Usko band karke try karein." };
+    }
+    if (name === "SecurityError") {
+      return { ok: false, error: "Microphone ke liye HTTPS chahiye." };
+    }
+    return { ok: false, error: permissionHelp() };
   }
 }
 
@@ -112,124 +147,171 @@ type Recog = {
 export type VoiceCaptureResult = {
   transcript: string;
   audioUrl: string | null;
+  audioBlob: Blob | null;
+  durationMs: number;
+};
+
+function pickMime(): string {
+  if (typeof MediaRecorder === "undefined") return "";
+  const types = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"];
+  return types.find((t) => MediaRecorder.isTypeSupported(t)) ?? "";
+}
+
+function recogLang(lang: AgentLang) {
+  if (lang === "ur") return "ur-PK";
+  if (lang === "pa") return "pa-IN";
+  if (lang === "ru") return "en-IN";
+  return "en-US";
+}
+
+function speechCtor(): (new () => Recog) | null {
+  const w = window as unknown as {
+    SpeechRecognition?: new () => Recog;
+    webkitSpeechRecognition?: new () => Recog;
+  };
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
+}
+
+export type VoiceSession = {
+  start: () => Promise<void>;
+  stop: () => Promise<VoiceCaptureResult>;
+  cancel: () => void;
 };
 
 /**
- * Record real audio + speech-to-text for understanding.
- * UI shows audio; agent uses transcript.
+ * Manual record session: start → stop/cancel.
+ * Audio stays as a local blob URL only (never uploaded or stored).
+ * SpeechRecognition runs in parallel so the agent can understand the clip.
  */
-export function startVoiceCapture(
-  lang: AgentLang,
-  onDone: (result: VoiceCaptureResult) => void,
-  onError: (msg: string) => void,
-): () => void {
-  let stopped = false;
+export function createVoiceSession(lang: AgentLang): VoiceSession {
   let stream: MediaStream | null = null;
   let recorder: MediaRecorder | null = null;
+  let recog: Recog | null = null;
   const chunks: BlobPart[] = [];
   let transcript = "";
-  let recog: Recog | null = null;
+  let startedAt = 0;
+  let stopped = false;
 
-  const finish = () => {
-    if (stopped) return;
-    stopped = true;
+  const tearDown = () => {
     try {
-      recog?.stop();
+      recog?.abort();
     } catch {
       /* */
     }
+    recog = null;
     try {
       if (recorder && recorder.state !== "inactive") recorder.stop();
     } catch {
       /* */
     }
     stream?.getTracks().forEach((t) => t.stop());
+    stream = null;
   };
 
-  void (async () => {
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch {
-      onError("Mic permission chahiye. Browser address bar se Allow karein.");
-      return;
-    }
-
-    try {
-      recorder = new MediaRecorder(stream);
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunks.push(e.data);
-      };
-      recorder.onstop = () => {
-        let audioUrl: string | null = null;
-        if (chunks.length) {
-          const blob = new Blob(chunks, { type: recorder?.mimeType || "audio/webm" });
-          audioUrl = URL.createObjectURL(blob);
-        }
-        const text = transcript.trim();
-        if (!text && !audioUrl) {
-          onError("Kuch suna nahi gaya. Dobara try karein.");
-          return;
-        }
-        onDone({ transcript: text || "(voice)", audioUrl });
-      };
-      recorder.start();
-    } catch {
-      /* recording optional; STT still works */
-    }
-
-    const Ctor =
-      (
-        window as unknown as {
-          SpeechRecognition?: new () => Recog;
-          webkitSpeechRecognition?: new () => Recog;
-        }
-      ).SpeechRecognition ??
-      (window as unknown as { webkitSpeechRecognition?: new () => Recog }).webkitSpeechRecognition;
-
-    if (!Ctor) {
-      window.setTimeout(() => {
-        if (stopped) return;
-        finish();
-      }, 8000);
-      onError("Is browser mein speech-to-text nahi hai. Chrome use karein, ya type karein.");
-      return;
-    }
-
+  const startRecog = () => {
+    const Ctor = speechCtor();
+    if (!Ctor) return;
     recog = new Ctor();
-    recog.lang = lang === "ur" ? "ur-PK" : lang === "ru" ? "en-IN" : "en-US";
-    recog.interimResults = false;
-    recog.continuous = false;
+    recog.lang = recogLang(lang);
+    recog.interimResults = true;
+    recog.continuous = true;
     recog.maxAlternatives = 1;
     recog.onresult = (ev) => {
-      const t = ev.results[0]?.[0]?.transcript?.trim();
-      if (t) transcript = t;
-    };
-    recog.onerror = (ev) => {
-      if (stopped) return;
-      if (ev.error === "not-allowed") {
-        finish();
-        onError("Mic permission blocked hai.");
-      } else if (ev.error === "no-speech") {
-        finish();
-        onError("Koi awaaz nahi mili. Dobara mic dabayein.");
-      } else if (ev.error !== "aborted") {
-        finish();
-        onError("Voice catch nahi hui. Dobara try karein.");
+      const parts: string[] = [];
+      for (let i = 0; i < ev.results.length; i++) {
+        const row = ev.results[i];
+        const bit = row?.[0]?.transcript?.trim();
+        if (bit) parts.push(bit);
       }
+      if (parts.length) transcript = parts.join(" ");
+    };
+    recog.onerror = () => {
+      /* keep recording even if STT hiccups */
     };
     recog.onend = () => {
       if (stopped) return;
-      finish();
+      try {
+        recog?.start();
+      } catch {
+        /* */
+      }
     };
     try {
       recog.start();
     } catch {
-      finish();
-      onError("Mic start nahi ho saka.");
+      recog = null;
     }
-  })();
-
-  return () => {
-    finish();
   };
+
+  return {
+    async start() {
+      stopped = false;
+      chunks.length = 0;
+      transcript = "";
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true },
+      });
+      const mime = pickMime();
+      recorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data);
+      };
+      recorder.start(250);
+      startedAt = Date.now();
+      startRecog();
+    },
+
+    stop() {
+      return new Promise<VoiceCaptureResult>((resolve) => {
+        if (stopped) {
+          resolve({ transcript: "", audioUrl: null, audioBlob: null, durationMs: 0 });
+          return;
+        }
+        stopped = true;
+        const durationMs = startedAt ? Date.now() - startedAt : 0;
+        try {
+          recog?.stop();
+        } catch {
+          /* */
+        }
+        const finish = () => {
+          stream?.getTracks().forEach((t) => t.stop());
+          stream = null;
+          let audioBlob: Blob | null = null;
+          let audioUrl: string | null = null;
+          if (chunks.length) {
+            audioBlob = new Blob(chunks, { type: recorder?.mimeType || "audio/webm" });
+            audioUrl = URL.createObjectURL(audioBlob);
+          }
+          resolve({
+            transcript: transcript.trim(),
+            audioUrl,
+            audioBlob,
+            durationMs,
+          });
+        };
+        if (recorder && recorder.state !== "inactive") {
+          recorder.onstop = finish;
+          try {
+            recorder.stop();
+          } catch {
+            finish();
+          }
+        } else {
+          finish();
+        }
+      });
+    },
+
+    cancel() {
+      stopped = true;
+      tearDown();
+      chunks.length = 0;
+      transcript = "";
+    },
+  };
+}
+
+export function revokeVoiceUrl(url: string | null | undefined) {
+  if (url && url.startsWith("blob:")) URL.revokeObjectURL(url);
 }
