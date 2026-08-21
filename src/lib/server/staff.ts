@@ -1,10 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { getSql } from "@/lib/db";
+import { databaseConfigured, getSql } from "@/lib/db";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { seedIfEmpty } from "./seed";
 
 export async function requireStaff(userId: string) {
+  if (!databaseConfigured) return "owner";
   const sql = await getSql();
   await seedIfEmpty(sql);
   const mine = await sql<{ role: string }>`select role from staff where user_id = ${userId}`;
