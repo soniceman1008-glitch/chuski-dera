@@ -8,7 +8,7 @@ import { itemCount, useCart } from "@/lib/cart-store";
 import { useCatalog } from "@/lib/catalog-store";
 import { useHasMounted } from "@/lib/use-has-mounted";
 
-const CALL_DISPLAY = "+923139235645";
+const CALL_DISPLAY = "03139235654";
 
 export const Route = createFileRoute("/")({ component: Home });
 
