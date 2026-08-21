@@ -1,4 +1,4 @@
-import type { AgentLang } from "./wa-agent";
+import type { VoiceLang } from "./voice-lang";
 
 let current: HTMLAudioElement | null = null;
 
@@ -19,7 +19,7 @@ export function voiceScript(text: string) {
   return `${first.slice(0, 280)}.`;
 }
 
-function pickVoice(lang: AgentLang): SpeechSynthesisVoice | null {
+function pickVoice(lang: VoiceLang): SpeechSynthesisVoice | null {
   const synth = window.speechSynthesis;
   if (!synth) return null;
   const voices = synth.getVoices();
@@ -55,7 +55,7 @@ function pickVoice(lang: AgentLang): SpeechSynthesisVoice | null {
   );
 }
 
-function ttsLang(lang: AgentLang) {
+function ttsLang(lang: VoiceLang) {
   if (lang === "ur") return "ur-PK";
   if (lang === "pa") return "hi-IN";
   if (lang === "ru") return "en-IN";
@@ -63,7 +63,7 @@ function ttsLang(lang: AgentLang) {
 }
 
 /** Speak AI reply in the sender's language (audio only path). */
-export async function speakAgentReply(text: string, lang: AgentLang): Promise<void> {
+export async function speakAgentReply(text: string, lang: VoiceLang): Promise<void> {
   if (typeof window === "undefined") return;
   stopAgentVoice();
   const script = voiceScript(text);
@@ -157,7 +157,7 @@ function pickMime(): string {
   return types.find((t) => MediaRecorder.isTypeSupported(t)) ?? "";
 }
 
-function recogLang(lang: AgentLang) {
+function recogLang(lang: VoiceLang) {
   if (lang === "ur") return "ur-PK";
   if (lang === "pa") return "pa-IN";
   if (lang === "ru") return "en-IN";
@@ -183,7 +183,7 @@ export type VoiceSession = {
  * Audio stays as a local blob URL only (never uploaded or stored).
  * SpeechRecognition runs in parallel so the agent can understand the clip.
  */
-export function createVoiceSession(lang: AgentLang): VoiceSession {
+export function createVoiceSession(lang: VoiceLang): VoiceSession {
   let stream: MediaStream | null = null;
   let recorder: MediaRecorder | null = null;
   let recog: Recog | null = null;
