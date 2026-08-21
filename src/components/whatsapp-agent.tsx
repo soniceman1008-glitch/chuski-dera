@@ -3,15 +3,27 @@ import { Mic, Square, X } from "lucide-react";
 import { RESTAURANT } from "@/lib/menu";
 import { useCart } from "@/lib/cart-store";
 import { whatsappOrderHref } from "@/lib/whatsapp";
-import { speakAgentReply, startListening, stopAgentVoice } from "@/lib/agent-voice";
+import {
+  requestMicPermission,
+  speakAgentReply,
+  startVoiceCapture,
+  stopAgentVoice,
+} from "@/lib/agent-voice";
 import {
   agentReply,
+  detectLang,
   greet,
   initialAgentState,
   type AgentState,
 } from "@/lib/wa-agent";
 
-type ChatMsg = { id: number; role: "bot" | "user"; text: string; voice?: boolean };
+type ChatMsg = {
+  id: number;
+  role: "bot" | "user";
+  text: string;
+  voice?: boolean;
+  audioUrl?: string | null;
+};
 
 export function WhatsAppAgent({
   open,
@@ -27,6 +39,7 @@ export function WhatsAppAgent({
   const [draft, setDraft] = useState("");
   const [booted, setBooted] = useState(false);
   const [listening, setListening] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
   const idRef = useRef(1);
   const stateRef = useRef(state);
@@ -38,8 +51,10 @@ export function WhatsAppAgent({
     if (!booted) {
       const next = initialAgentState(customer);
       setState(next);
-      setMsgs([{ id: idRef.current++, role: "bot", text: greet("ru") }]);
+      const hello = greet("ru");
+      setMsgs([{ id: idRef.current++, role: "bot", text: hello, voice: true }]);
       setBooted(true);
+      void speakAgentReply(hello, "ru");
     }
   }, [open, booted, customer]);
 
@@ -49,6 +64,7 @@ export function WhatsAppAgent({
       stopAgentVoice();
       stopListen.current?.();
       setListening(false);
+      setSpeaking(false);
     }
   }, [open]);
 
@@ -56,48 +72,76 @@ export function WhatsAppAgent({
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: "smooth" });
   }, [msgs, open]);
 
-  function push(role: ChatMsg["role"], text: string, voice = false) {
-    setMsgs((m) => [...m, { id: idRef.current++, role, text, voice }]);
+  function push(role: ChatMsg["role"], text: string, voice = false, audioUrl: string | null = null) {
+    setMsgs((m) => [...m, { id: idRef.current++, role, text, voice, audioUrl }]);
   }
 
-  function send(text: string, viaVoice = false) {
+  function send(text: string, viaVoice = false, audioUrl: string | null = null) {
     const value = text.trim();
     if (!value) return;
-    push("user", value, viaVoice);
+    // Voice path: show as audio bubble, not plain text
+    if (viaVoice) {
+      push("user", value, true, audioUrl);
+    } else {
+      push("user", value, false);
+    }
     setDraft("");
     const result = agentReply(stateRef.current, value);
     setState(result.state);
     stateRef.current = result.state;
     window.setTimeout(() => {
-      for (const line of result.messages) {
-        push("bot", line, viaVoice);
-        if (viaVoice) void speakAgentReply(line, result.state.lang);
-      }
-      if (result.sendWhatsApp && result.state.lines.length) {
-        setCustomer(result.state.customer);
-        window.open(
-          whatsappOrderHref(result.state.lines, result.state.customer),
-          "_blank",
-          "noopener,noreferrer",
-        );
-      }
+      void (async () => {
+        for (const line of result.messages) {
+          // Voice conversation: mark bot as voice; still keep short text for accessibility
+          push("bot", line, viaVoice);
+          if (viaVoice) {
+            setSpeaking(true);
+            await speakAgentReply(line, result.state.lang);
+            setSpeaking(false);
+          }
+        }
+        if (result.sendWhatsApp && result.state.lines.length) {
+          setCustomer(result.state.customer);
+          window.open(
+            whatsappOrderHref(result.state.lines, result.state.customer),
+            "_blank",
+            "noopener,noreferrer",
+          );
+        }
+      })();
     }, 280);
   }
 
-  function toggleMic() {
+  async function toggleMic() {
     if (listening) {
       stopListen.current?.();
       stopListen.current = null;
       setListening(false);
       return;
     }
+
+    stopAgentVoice();
+    setSpeaking(false);
+
+    const perm = await requestMicPermission();
+    if (!perm.ok) {
+      push("bot", perm.error ?? "Mic permission chahiye.");
+      return;
+    }
+
     setListening(true);
-    stopListen.current = startListening(
+    stopListen.current = startVoiceCapture(
       stateRef.current.lang,
-      (text) => {
+      (result) => {
         setListening(false);
         stopListen.current = null;
-        send(text, true);
+        // Detect language from spoken words so AI replies in same language
+        if (result.transcript && result.transcript !== "(voice)") {
+          const lang = detectLang(result.transcript);
+          stateRef.current = { ...stateRef.current, lang };
+          setState(stateRef.current);
+        }
+        send(result.transcript, true, result.audioUrl);
       },
       (msg) => {
         setListening(false);
@@ -124,7 +168,7 @@ export function WhatsAppAgent({
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold">{RESTAURANT.name}</p>
             <p className="truncate text-xs text-white/80">
-              {RESTAURANT.phoneDisplay} · AI · text & voice
+              {RESTAURANT.phoneDisplay} · AI · voice & text
             </p>
           </div>
           <button
@@ -148,12 +192,26 @@ export function WhatsAppAgent({
                 }
               >
                 {msg.voice && (
-                  <p className="mb-1 text-[11px] tracking-wide text-white/60 uppercase">Voice</p>
+                  <p className="mb-1 text-[11px] tracking-wide text-white/60 uppercase">
+                    {msg.role === "user" ? "Voice message" : "Voice reply"}
+                  </p>
                 )}
-                <p className="whitespace-pre-wrap">{msg.text}</p>
+                {msg.audioUrl ? (
+                  <audio controls src={msg.audioUrl} className="mb-1 max-w-full" preload="metadata" />
+                ) : null}
+                {/* Voice user messages: don't dump transcript as main content */}
+                {msg.role === "user" && msg.voice ? null : (
+                  <p className="whitespace-pre-wrap">{msg.text}</p>
+                )}
               </div>
             </div>
           ))}
+          {listening && (
+            <p className="text-center text-xs text-white/50">Listening… bolna shuru karein</p>
+          )}
+          {speaking && (
+            <p className="text-center text-xs text-white/50">AI bol rahi hai…</p>
+          )}
         </div>
 
         <form
@@ -165,7 +223,7 @@ export function WhatsAppAgent({
         >
           <button
             type="button"
-            onClick={toggleMic}
+            onClick={() => void toggleMic()}
             aria-label={listening ? "Stop listening" : "Voice message"}
             className={
               listening
@@ -185,7 +243,7 @@ export function WhatsAppAgent({
               }
             }}
             rows={1}
-            placeholder={listening ? "Listening…" : "Message"}
+            placeholder={listening ? "Listening…" : speaking ? "AI speaking…" : "Message"}
             className="max-h-28 min-h-11 flex-1 resize-none rounded-lg bg-[#2a3942] px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/40"
           />
           <button
