@@ -1,9 +1,9 @@
 import type { Sql } from "@/lib/db";
 import { CATEGORIES, FOOD_CATEGORIES, MENU, RESTAURANT } from "@/lib/menu";
 
-const CALL_DISPLAY = "+923139235654";
+const CALL_DISPLAY = "0313-9235654";
 const CALL_TEL = "+923139235654";
-const WA_DISPLAY = "+923139235654";
+const WA_DISPLAY = "0313-9235654";
 const WA_TEL = "+923139235654";
 
 export async function seedIfEmpty(sql: Sql) {
