@@ -1,12 +1,9 @@
+import { nlpClean } from "./nlp";
+
 export type VoiceLang = "en" | "ur" | "ru" | "pa" | "hi";
 
 function norm(s: string) {
-  return s
-    .toLowerCase()
-    .replace(/['’]/g, "")
-    .replace(/[^a-z0-9\u0600-\u06ff\u0900-\u097f\u0a00-\u0a7f\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  return nlpClean(s);
 }
 
 const PA_WORDS =
