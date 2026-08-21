@@ -10,19 +10,19 @@ export const Route = createFileRoute("/admin/settings")({ component: SettingsAdm
 function SettingsAdmin() {
   const { reload } = useCatalog();
   const [form, setForm] = useState<RestaurantSettings | null>(null);
-  const [error, setError] = useState("");
+  const [error, setFormError] = useState("");
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     void getAdminCatalog()
       .then((data) => setForm(data.settings))
-      .catch((e: Error) => setError(e.message));
+      .catch((e: Error) => setFormError(e.message));
   }, []);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (!form) return;
-    setError("");
+    setFormError("");
     try {
       await saveSettings({ data: form });
       notifyCatalogChanged();
@@ -30,7 +30,7 @@ function SettingsAdmin() {
       setSaved(true);
       window.setTimeout(() => setSaved(false), 2500);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
+      setFormError(err instanceof Error ? err.message : "Save failed");
     }
   }
 
@@ -60,7 +60,7 @@ function SettingsAdmin() {
         {field("city", "City")}
         {field("hours", "Hours")}
         {field("callDisplay", "Call display")}
-        {field("callTel", "Call tel (e.g. +923717400624)")}
+        {field("callTel", "Call tel (e.g. +923139235645)")}
         {field("waDisplay", "WhatsApp display")}
         {field("waTel", "WhatsApp tel")}
         {field("mapsQuery", "Maps query")}

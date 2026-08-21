@@ -13,10 +13,7 @@ export async function seedIfEmpty(sql: Sql) {
       wa_display = ${PHONE_DISPLAY},
       wa_tel = ${PHONE_TEL},
       updated_at = now()
-    where call_display in ('03717400624', '0371-7400624', '03139235654', '0313-9235654')
-       or call_tel in ('+923717400624', '03717400624', '+923139235654', '03139235654')
-       or wa_display in ('03717400624', '0371-7400624')
-       or wa_tel in ('+923717400624', '03717400624')
+    where id = 'main'
   `;
 
   const existing = await sql<{ n: number }>`select count(*)::int as n from settings`;
