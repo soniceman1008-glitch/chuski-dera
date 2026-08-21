@@ -14,67 +14,58 @@ export function stopAgentVoice() {
 
 export function voiceScript(text: string) {
   const trimmed = text.trim();
-  if (trimmed.length <= 360) return trimmed;
+  if (trimmed.length <= 220) return trimmed;
   const first = trimmed.split("\n")[0] ?? trimmed;
-  return `${first.slice(0, 320)}.`;
+  return `${first.slice(0, 200)}.`;
 }
 
-function southAsian(voices: SpeechSynthesisVoice[]) {
-  return (
-    voices.find((v) => /en-IN|hi-IN|ur|pa|hindi|india|pakistan/i.test(`${v.name} ${v.lang}`)) ??
-    null
+function isFemaleVoice(v: SpeechSynthesisVoice) {
+  return /female|woman|girl|neerja|swara|uzma|heera|zira|samantha|victoria|karen|moira|tessa|fiona|susan|hazel|aria|jenny|sonia|ava|emma|joanna|ivy|salli|aditi|ananya/i.test(
+    v.name,
   );
+}
+
+function isMaleVoice(v: SpeechSynthesisVoice) {
+  return /male|\bman\b|david|mark|ravi|george|daniel|fred|alex|richard|thomas|matthew|guy|prabhat/i.test(
+    v.name,
+  );
+}
+
+function scoreVoice(v: SpeechSynthesisVoice, lang: VoiceLang) {
+  const hay = `${v.name} ${v.lang}`.toLowerCase();
+  let n = 0;
+  if (isFemaleVoice(v)) n += 8;
+  if (isMaleVoice(v)) n -= 12;
+  if (lang === "ur") {
+    if (/ur/.test(hay)) n += 6;
+    if (/pakistan|urdu/.test(hay)) n += 5;
+    if (/hi-in|hindi|india/.test(hay)) n += 3;
+  } else if (lang === "ru") {
+    if (/en-in|india|neerja/.test(hay)) n += 7;
+    if (/^en/.test(v.lang)) n += 4;
+  } else if (lang === "hi") {
+    if (/hi-in|hindi/.test(hay)) n += 6;
+  } else if (lang === "pa") {
+    if (/\bpa\b|punjabi/.test(hay)) n += 6;
+    if (/hi-in|hindi/.test(hay)) n += 3;
+  } else if (/en-in|india/.test(hay)) n += 5;
+  else if (/^en/.test(v.lang)) n += 3;
+  return n;
 }
 
 function pickVoice(lang: VoiceLang): SpeechSynthesisVoice | null {
   const synth = window.speechSynthesis;
   if (!synth) return null;
   const voices = synth.getVoices();
-  if (lang === "ur" || lang === "ru") {
-    return (
-      voices.find((v) => /ur/i.test(v.lang)) ??
-      voices.find((v) => /pakistan|urdu/i.test(`${v.name} ${v.lang}`)) ??
-      southAsian(voices)
-    );
-  }
-  if (lang === "hi") {
-    return voices.find((v) => /hi-IN|hindi/i.test(`${v.name} ${v.lang}`)) ?? southAsian(voices);
-  }
-  if (lang === "pa") {
-    return (
-      voices.find((v) => /pa/i.test(v.lang)) ??
-      voices.find((v) => /punjabi/i.test(`${v.name} ${v.lang}`)) ??
-      voices.find((v) => /hi-IN|hindi/i.test(`${v.name} ${v.lang}`)) ??
-      southAsian(voices)
-    );
-  }
-  return (
-    voices.find((v) => /en-IN|india/i.test(`${v.name} ${v.lang}`)) ??
-    voices.find((v) => /^en/i.test(v.lang)) ??
-    null
-  );
+  if (!voices.length) return null;
+  return [...voices].sort((a, b) => scoreVoice(b, lang) - scoreVoice(a, lang))[0] ?? null;
 }
 
 function ttsLang(lang: VoiceLang) {
   if (lang === "ur") return "ur-PK";
   if (lang === "hi") return "hi-IN";
-  if (lang === "pa") return "pa-IN";
-  if (lang === "ru") return "ur-PK";
+  if (lang === "pa") return "hi-IN";
   return "en-IN";
-}
-
-async function playBlobUrl(url: string) {
-  stopAgentVoice();
-  const a = new Audio(url);
-  a.setAttribute("playsinline", "true");
-  a.preload = "auto";
-  current = a;
-  await new Promise<void>((resolve) => {
-    const done = () => resolve();
-    a.addEventListener("ended", done, { once: true });
-    a.addEventListener("error", done, { once: true });
-    void a.play().catch(() => resolve());
-  });
 }
 
 async function speakBrowser(script: string, lang: VoiceLang) {
@@ -90,8 +81,8 @@ async function speakBrowser(script: string, lang: VoiceLang) {
     const speak = () => {
       synth.cancel();
       const u = new SpeechSynthesisUtterance(script);
-      u.rate = 0.9;
-      u.pitch = 1;
+      u.rate = lang === "ur" ? 0.9 : 0.95;
+      u.pitch = 1.05;
       u.volume = 1;
       u.lang = ttsLang(lang);
       const pick = pickVoice(lang);
@@ -110,29 +101,11 @@ async function speakBrowser(script: string, lang: VoiceLang) {
   });
 }
 
-/** Speak AI reply. Prefers house-voice MP3, then browser TTS. Returns playable URL if any. */
+/** Speak immediately with on-device female TTS. Skip slow server synthesis. */
 export async function speakAgentReply(text: string, lang: VoiceLang): Promise<string | null> {
   if (typeof window === "undefined") return null;
   stopAgentVoice();
-  const script = voiceScript(text);
-  try {
-    const res = await fetch("/api/agent-tts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: script, lang }),
-    });
-    if (res.ok) {
-      const blob = await res.blob();
-      if (blob.size > 200) {
-        const url = URL.createObjectURL(blob);
-        await playBlobUrl(url);
-        return url;
-      }
-    }
-  } catch {
-    /* browser fallback */
-  }
-  await speakBrowser(script, lang);
+  await speakBrowser(voiceScript(text), lang);
   return null;
 }
 
