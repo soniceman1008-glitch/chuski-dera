@@ -1,0 +1,85 @@
+import { useState } from "react";
+import { dealIncludes, formatRs } from "@/lib/menu";
+import { qtyOf, useCart } from "@/lib/cart-store";
+import { QtyStepper } from "@/components/qty-stepper";
+import { useHasMounted } from "@/lib/use-has-mounted";
+import { playChoiceVoice } from "@/lib/choice-voice";
+
+type DealItem = {
+  id: string;
+  name: string;
+  blurb: string;
+  price: number;
+  image: string;
+  includes?: string[];
+};
+
+export function DealCard({ item }: { item: DealItem }) {
+  const [broken, setBroken] = useState(false);
+  const mounted = useHasMounted();
+  const lines = useCart((s) => s.lines);
+  const add = useCart((s) => s.add);
+  const setQty = useCart((s) => s.setQty);
+  const qty = mounted ? qtyOf(lines, item.id) : 0;
+  const extras = dealIncludes(item);
+
+  function choose() {
+    playChoiceVoice();
+    add(item.id);
+  }
+
+  return (
+    <article className="group flex flex-col overflow-hidden rounded-xl bg-surface shadow-[var(--shadow-card)]">
+      <button
+        type="button"
+        onClick={choose}
+        className="aspect-[4/3] w-full cursor-pointer overflow-hidden border-0 bg-elevated p-0 text-left"
+        aria-label={`Add ${item.name} to cart`}
+      >
+        {broken || !item.image ? (
+          <div className="grid size-full place-items-center bg-elevated text-xs text-muted">{item.name}</div>
+        ) : (
+          <img
+            src={item.image}
+            alt={item.name}
+            className="size-full object-cover transition-transform duration-500 ease-[var(--ease-smooth-out)] group-hover:scale-[1.04]"
+            onError={() => setBroken(true)}
+          />
+        )}
+      </button>
+      <div className="flex flex-1 flex-col gap-3 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="font-medium leading-snug">{item.name}</h3>
+          <p className="shrink-0 text-sm font-semibold tabular-nums text-primary">{formatRs(item.price)}</p>
+        </div>
+        <ul className="space-y-1 text-sm text-muted">
+          {extras.map((line) => (
+            <li key={line} className="flex gap-2">
+              <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary" />
+              <span>{line}</span>
+            </li>
+          ))}
+        </ul>
+        <div className="mt-auto">
+          {qty > 0 ? (
+            <QtyStepper
+              qty={qty}
+              label={item.name}
+              wide
+              onDec={() => setQty(item.id, qty - 1)}
+              onInc={choose}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={choose}
+              className="inline-flex h-11 w-full items-center justify-center rounded-md bg-primary px-4 text-sm font-semibold text-primary-fg transition-transform duration-150 hover:bg-primary-hot active:scale-[0.96]"
+            >
+              Add to cart
+            </button>
+          )}
+        </div>
+      </div>
+    </article>
+  );
+}
