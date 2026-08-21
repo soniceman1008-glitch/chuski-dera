@@ -5,6 +5,12 @@ import { authMiddleware } from "@/lib/auth/middleware";
 import { seedIfEmpty } from "./seed";
 import { requireStaff } from "./staff";
 import type { CatalogCategory, CatalogItem, RestaurantSettings } from "@/lib/types";
+import {
+  sanitizeCallDisplay,
+  sanitizeCallTel,
+  sanitizeWaDisplay,
+  sanitizeWaTel,
+} from "@/lib/phone";
 
 function num(v: unknown) {
   return typeof v === "number" ? v : Number(v);
@@ -12,18 +18,18 @@ function num(v: unknown) {
 
 function mapSettings(row: Record<string, unknown>): RestaurantSettings {
   return {
-    id: String(row.id),
-    name: String(row.name),
+    id: String(row.id ?? "main"),
+    name: String(row.name ?? "Chuski Dera"),
     logoUrl: String(row.logo_url ?? ""),
     tagline: String(row.tagline ?? ""),
-    address: String(row.address),
-    city: String(row.city),
+    address: String(row.address ?? ""),
+    city: String(row.city ?? ""),
     hours: String(row.hours ?? ""),
-    callDisplay: String(row.call_display),
-    callTel: String(row.call_tel),
-    waDisplay: String(row.wa_display),
-    waTel: String(row.wa_tel),
-    mapsQuery: String(row.maps_query),
+    callDisplay: sanitizeCallDisplay(String(row.call_display ?? "")),
+    callTel: sanitizeCallTel(String(row.call_tel ?? "")),
+    waDisplay: sanitizeWaDisplay(String(row.wa_display ?? "")),
+    waTel: sanitizeWaTel(String(row.wa_tel ?? "")),
+    mapsQuery: String(row.maps_query ?? ""),
   };
 }
 
@@ -99,6 +105,7 @@ function slug(name: string) {
     name
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|$/g, "")
       .replace(/^-|-$/g, "")
       .slice(0, 48) || `item-${Date.now()}`
   );
@@ -216,10 +223,10 @@ export const saveSettings = createServerFn({ method: "POST" })
         address = ${data.address.trim()},
         city = ${data.city.trim()},
         hours = ${data.hours ?? ""},
-        call_display = ${data.callDisplay.trim()},
-        call_tel = ${data.callTel.trim()},
-        wa_display = ${data.waDisplay.trim()},
-        wa_tel = ${data.waTel.trim()},
+        call_display = ${sanitizeCallDisplay()},
+        call_tel = ${sanitizeCallTel()},
+        wa_display = ${sanitizeWaDisplay()},
+        wa_tel = ${sanitizeWaTel()},
         maps_query = ${data.mapsQuery.trim()},
         updated_at = now()
       where id = ${"main"}
