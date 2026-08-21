@@ -14,9 +14,16 @@ export function stopAgentVoice() {
 
 export function voiceScript(text: string) {
   const trimmed = text.trim();
-  if (trimmed.length <= 320) return trimmed;
+  if (trimmed.length <= 360) return trimmed;
   const first = trimmed.split("\n")[0] ?? trimmed;
-  return `${first.slice(0, 280)}.`;
+  return `${first.slice(0, 320)}.`;
+}
+
+function southAsian(voices: SpeechSynthesisVoice[]) {
+  return (
+    voices.find((v) => /en-IN|hi-IN|ur|pa|hindi|india|pakistan/i.test(`${v.name} ${v.lang}`)) ??
+    null
+  );
 }
 
 function pickVoice(lang: VoiceLang): SpeechSynthesisVoice | null {
@@ -27,8 +34,13 @@ function pickVoice(lang: VoiceLang): SpeechSynthesisVoice | null {
     return (
       voices.find((v) => /ur/i.test(v.lang)) ??
       voices.find((v) => /pakistan|urdu/i.test(`${v.name} ${v.lang}`)) ??
+      southAsian(voices)
+    );
+  }
+  if (lang === "hi") {
+    return (
       voices.find((v) => /hi-IN|hindi/i.test(`${v.name} ${v.lang}`)) ??
-      null
+      southAsian(voices)
     );
   }
   if (lang === "pa") {
@@ -36,16 +48,14 @@ function pickVoice(lang: VoiceLang): SpeechSynthesisVoice | null {
       voices.find((v) => /pa/i.test(v.lang)) ??
       voices.find((v) => /punjabi/i.test(`${v.name} ${v.lang}`)) ??
       voices.find((v) => /hi-IN|hindi/i.test(`${v.name} ${v.lang}`)) ??
-      voices.find((v) => /ur/i.test(v.lang)) ??
-      null
+      southAsian(voices)
     );
   }
   if (lang === "ru") {
     return (
       voices.find((v) => /en-IN|india/i.test(`${v.name} ${v.lang}`)) ??
       voices.find((v) => /ur/i.test(v.lang)) ??
-      voices.find((v) => /en-GB/i.test(v.lang) && /female|samantha|zira|sonia/i.test(v.name)) ??
-      null
+      southAsian(voices)
     );
   }
   return (
@@ -57,12 +67,13 @@ function pickVoice(lang: VoiceLang): SpeechSynthesisVoice | null {
 
 function ttsLang(lang: VoiceLang) {
   if (lang === "ur") return "ur-PK";
-  if (lang === "pa") return "hi-IN";
+  if (lang === "hi") return "hi-IN";
+  if (lang === "pa") return "pa-IN";
   if (lang === "ru") return "en-IN";
   return "en-GB";
 }
 
-/** Speak AI reply in the sender's language (audio only path). */
+/** Speak AI reply in the sender's latest language (audio only). */
 export async function speakAgentReply(text: string, lang: VoiceLang): Promise<void> {
   if (typeof window === "undefined") return;
   stopAgentVoice();
@@ -71,22 +82,29 @@ export async function speakAgentReply(text: string, lang: VoiceLang): Promise<vo
   if (!synth) return;
 
   await new Promise<void>((resolve) => {
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      resolve();
+    };
     const speak = () => {
       synth.cancel();
       const u = new SpeechSynthesisUtterance(script);
-      u.rate = 0.92;
+      u.rate = lang === "en" ? 0.95 : 0.9;
       u.pitch = 1.02;
       u.volume = 1;
       u.lang = ttsLang(lang);
       const pick = pickVoice(lang);
       if (pick) u.voice = pick;
-      u.onend = () => resolve();
-      u.onerror = () => resolve();
+      u.onend = finish;
+      u.onerror = finish;
       synth.speak(u);
+      window.setTimeout(finish, Math.min(20_000, 800 + script.length * 80));
     };
     if (synth.getVoices().length === 0) {
       synth.addEventListener("voiceschanged", () => speak(), { once: true });
-      window.setTimeout(speak, 300);
+      window.setTimeout(speak, 280);
     } else {
       speak();
     }
@@ -102,7 +120,6 @@ export function permissionHelp(): string {
   ].join("\n");
 }
 
-/** Ask for microphone permission explicitly. */
 export async function requestMicPermission(): Promise<{ ok: boolean; error?: string }> {
   if (typeof window === "undefined" || !navigator.mediaDevices?.getUserMedia) {
     return { ok: false, error: "Is browser mein microphone support nahi hai. Chrome use karein." };
@@ -157,11 +174,11 @@ function pickMime(): string {
   return types.find((t) => MediaRecorder.isTypeSupported(t)) ?? "";
 }
 
-function recogLang(lang: VoiceLang) {
-  if (lang === "ur") return "ur-PK";
-  if (lang === "pa") return "pa-IN";
-  if (lang === "ru") return "en-IN";
-  return "en-US";
+function recogLangs(hint: VoiceLang): string[] {
+  const primary =
+    hint === "ur" ? "ur-PK" : hint === "pa" ? "pa-IN" : hint === "hi" ? "hi-IN" : hint === "ru" ? "en-IN" : "en-US";
+  const extras = ["en-IN", "ur-PK", "hi-IN", "pa-IN", "en-US"];
+  return [primary, ...extras.filter((x) => x !== primary)];
 }
 
 function speechCtor(): (new () => Recog) | null {
@@ -178,27 +195,35 @@ export type VoiceSession = {
   cancel: () => void;
 };
 
+function bestTranscript(parts: string[]) {
+  return parts
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .sort((a, b) => b.length - a.length)[0] ?? "";
+}
+
 /**
- * Manual record session: start → stop/cancel.
- * Audio stays as a local blob URL only (never uploaded or stored).
- * SpeechRecognition runs in parallel so the agent can understand the clip.
+ * Manual record session. SpeechRecognition runs in a few languages so the
+ * latest utterance can switch Urdu / English / Punjabi / Hindi.
  */
 export function createVoiceSession(lang: VoiceLang): VoiceSession {
   let stream: MediaStream | null = null;
   let recorder: MediaRecorder | null = null;
-  let recog: Recog | null = null;
+  const recogs: Recog[] = [];
   const chunks: BlobPart[] = [];
-  let transcript = "";
+  const transcripts: string[] = [];
   let startedAt = 0;
   let stopped = false;
 
   const tearDown = () => {
-    try {
-      recog?.abort();
-    } catch {
-      /* */
+    for (const r of recogs) {
+      try {
+        r.abort();
+      } catch {
+        /* */
+      }
     }
-    recog = null;
+    recogs.length = 0;
     try {
       if (recorder && recorder.state !== "inactive") recorder.stop();
     } catch {
@@ -208,38 +233,38 @@ export function createVoiceSession(lang: VoiceLang): VoiceSession {
     stream = null;
   };
 
-  const startRecog = () => {
+  const startOne = (code: string) => {
     const Ctor = speechCtor();
     if (!Ctor) return;
-    recog = new Ctor();
-    recog.lang = recogLang(lang);
-    recog.interimResults = true;
-    recog.continuous = true;
-    recog.maxAlternatives = 1;
-    recog.onresult = (ev) => {
-      const parts: string[] = [];
-      for (let i = 0; i < ev.results.length; i++) {
-        const row = ev.results[i];
-        const bit = row?.[0]?.transcript?.trim();
-        if (bit) parts.push(bit);
-      }
-      if (parts.length) transcript = parts.join(" ");
-    };
-    recog.onerror = () => {
-      /* keep recording even if STT hiccups */
-    };
-    recog.onend = () => {
-      if (stopped) return;
-      try {
-        recog?.start();
-      } catch {
-        /* */
-      }
-    };
     try {
+      const recog = new Ctor();
+      recog.lang = code;
+      recog.interimResults = true;
+      recog.continuous = true;
+      recog.maxAlternatives = 1;
+      recog.onresult = (ev) => {
+        const parts: string[] = [];
+        for (let i = 0; i < ev.results.length; i++) {
+          const bit = ev.results[i]?.[0]?.transcript?.trim();
+          if (bit) parts.push(bit);
+        }
+        if (parts.length) transcripts.push(parts.join(" "));
+      };
+      recog.onerror = () => {
+        /* keep recording */
+      };
+      recog.onend = () => {
+        if (stopped) return;
+        try {
+          recog.start();
+        } catch {
+          /* */
+        }
+      };
       recog.start();
+      recogs.push(recog);
     } catch {
-      recog = null;
+      /* one engine is enough */
     }
   };
 
@@ -247,7 +272,7 @@ export function createVoiceSession(lang: VoiceLang): VoiceSession {
     async start() {
       stopped = false;
       chunks.length = 0;
-      transcript = "";
+      transcripts.length = 0;
       stream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true },
       });
@@ -258,7 +283,9 @@ export function createVoiceSession(lang: VoiceLang): VoiceSession {
       };
       recorder.start(250);
       startedAt = Date.now();
-      startRecog();
+      const langs = recogLangs(lang);
+      startOne(langs[0] ?? "en-IN");
+      if (langs[1]) startOne(langs[1]);
     },
 
     stop() {
@@ -269,14 +296,17 @@ export function createVoiceSession(lang: VoiceLang): VoiceSession {
         }
         stopped = true;
         const durationMs = startedAt ? Date.now() - startedAt : 0;
-        try {
-          recog?.stop();
-        } catch {
-          /* */
+        for (const r of recogs) {
+          try {
+            r.stop();
+          } catch {
+            /* */
+          }
         }
         const finish = () => {
           stream?.getTracks().forEach((t) => t.stop());
           stream = null;
+          recogs.length = 0;
           let audioBlob: Blob | null = null;
           let audioUrl: string | null = null;
           if (chunks.length) {
@@ -284,22 +314,24 @@ export function createVoiceSession(lang: VoiceLang): VoiceSession {
             audioUrl = URL.createObjectURL(audioBlob);
           }
           resolve({
-            transcript: transcript.trim(),
+            transcript: bestTranscript(transcripts),
             audioUrl,
             audioBlob,
             durationMs,
           });
         };
-        if (recorder && recorder.state !== "inactive") {
-          recorder.onstop = finish;
-          try {
-            recorder.stop();
-          } catch {
+        window.setTimeout(() => {
+          if (recorder && recorder.state !== "inactive") {
+            recorder.onstop = finish;
+            try {
+              recorder.stop();
+            } catch {
+              finish();
+            }
+          } else {
             finish();
           }
-        } else {
-          finish();
-        }
+        }, 180);
       });
     },
 
@@ -307,7 +339,7 @@ export function createVoiceSession(lang: VoiceLang): VoiceSession {
       stopped = true;
       tearDown();
       chunks.length = 0;
-      transcript = "";
+      transcripts.length = 0;
     },
   };
 }
