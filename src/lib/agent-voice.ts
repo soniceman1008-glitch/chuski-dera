@@ -37,20 +37,14 @@ function scoreVoice(v: SpeechSynthesisVoice, lang: VoiceLang) {
   let n = 0;
   if (isFemaleVoice(v)) n += 8;
   if (isMaleVoice(v)) n -= 12;
-  if (lang === "ur") {
-    if (/ur/.test(hay)) n += 6;
-    if (/pakistan|urdu/.test(hay)) n += 5;
-    if (/hi-in|hindi|india/.test(hay)) n += 3;
-  } else if (lang === "ru") {
-    if (/en-in|india|neerja/.test(hay)) n += 7;
-    if (/^en/.test(v.lang)) n += 4;
-  } else if (lang === "hi") {
-    if (/hi-in|hindi/.test(hay)) n += 6;
-  } else if (lang === "pa") {
-    if (/\bpa\b|punjabi/.test(hay)) n += 6;
-    if (/hi-in|hindi/.test(hay)) n += 3;
-  } else if (/en-in|india/.test(hay)) n += 5;
-  else if (/^en/.test(v.lang)) n += 3;
+  if (lang === "en") {
+    if (/en-in|india/.test(hay)) n += 5;
+    else if (/^en/.test(v.lang)) n += 3;
+    return n;
+  }
+  if (/ur/.test(hay)) n += 8;
+  if (/pakistan|urdu|uzma/.test(hay)) n += 7;
+  if (/hi-in|hindi|swara|heera/.test(hay)) n += 5;
   return n;
 }
 
@@ -63,10 +57,9 @@ function pickVoice(lang: VoiceLang): SpeechSynthesisVoice | null {
 }
 
 function ttsLang(lang: VoiceLang) {
-  if (lang === "ur") return "ur-PK";
+  if (lang === "en") return "en-IN";
   if (lang === "hi") return "hi-IN";
-  if (lang === "pa") return "hi-IN";
-  return "en-IN";
+  return "ur-PK";
 }
 
 async function speakBrowser(script: string, lang: VoiceLang) {
@@ -82,8 +75,8 @@ async function speakBrowser(script: string, lang: VoiceLang) {
     const speak = () => {
       synth.cancel();
       const u = new SpeechSynthesisUtterance(script);
-      u.rate = 0.82;
-      u.pitch = 1.02;
+      u.rate = 0.78;
+      u.pitch = 1;
       u.volume = 1;
       u.lang = ttsLang(lang);
       const pick = pickVoice(lang);
@@ -172,8 +165,7 @@ function recogLangs(hint: VoiceLang): string[] {
   if (hint === "en") return ["en-IN"];
   if (hint === "hi") return ["hi-IN"];
   if (hint === "pa") return ["pa-IN"];
-  if (hint === "ur") return ["ur-PK"];
-  return ["en-IN"];
+  return ["ur-PK"];
 }
 
 function speechCtor(): (new () => Recog) | null {
@@ -257,7 +249,7 @@ export function createVoiceSession(lang: VoiceLang): VoiceSession {
         throw new Error("Is browser mein voice recognition nahi hai. Chrome use karein.");
       }
       startedAt = Date.now();
-      startOne(recogLangs(lang)[0] ?? "en-IN");
+      startOne(recogLangs(lang)[0] ?? "ur-PK");
     },
 
     stop() {
