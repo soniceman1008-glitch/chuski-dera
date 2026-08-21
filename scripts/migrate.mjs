@@ -1,16 +1,9 @@
 #!/usr/bin/env node
 /**
- * Deploy-time database migrator (node-postgres, `pg`).
+ * Optional migrator for a real Postgres DATABASE_URL (Neon).
  *
- * Runs during `npm run build` — on every Vercel deploy — applying pending files
- * in ../migrations to DATABASE_URL. Each file is applied in one transaction and
- * recorded in a `_migrations` table, so it runs once and is safe to re-run.
- *
- * The read is non-recursive, so the opt-in auth schema under migrations/auth/
- * is not applied to an app that never asked for sign-in.
- *
- * No DATABASE_URL (local / preview builds) -> skip; the PGLite fallback applies
- * the same files at startup instead (see src/lib/db.ts).
+ * Production schema is also applied at runtime in src/lib/db.ts. This script is
+ * for local/CI use. It never falls back to localhost.
  */
 import { readdir, readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -18,12 +11,45 @@ import { dirname, join } from "node:path";
 import pg from "pg";
 import { pendingMigrations } from "./migration-plan.mjs";
 
-const databaseUrl = process.env.DATABASE_URL;
+function readDatabaseUrl() {
+  const raw = process.env["DATABASE_URL"];
+  if (raw == null) return undefined;
+  const trimmed = String(raw).trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function hostnameOf(databaseUrl) {
+  try {
+    return new URL(databaseUrl).hostname.toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+function isLocalHost(host) {
+  return !host || host === "localhost" || host === "127.0.0.1" || host === "::1";
+}
+
+const onVercel = Boolean(process.env["VERCEL"] || process.env["VERCEL_ENV"]);
+const databaseUrl = readDatabaseUrl();
+
 if (!databaseUrl) {
-  console.log(
-    "[migrate] DATABASE_URL not set — skipping (the PGLite fallback migrates itself).",
-  );
+  if (onVercel) {
+    console.error(
+      "[migrate] DATABASE_URL is missing. Add the Neon connection string in Vercel → Settings → Environment Variables, then redeploy.",
+    );
+    process.exit(1);
+  }
+  console.log("[migrate] DATABASE_URL not set — skipping.");
   process.exit(0);
+}
+
+const host = hostnameOf(databaseUrl);
+if (isLocalHost(host)) {
+  console.error(
+    "[migrate] DATABASE_URL host is localhost / 127.0.0.1. That cannot work on Vercel. Use the Neon pooled string from console.neon.tech (host ends with neon.tech). If the password contains @ : / #, URL-encode those characters.",
+  );
+  process.exit(1);
 }
 
 const migrationsDir = join(dirname(fileURLToPath(import.meta.url)), "..", "migrations");
@@ -36,13 +62,16 @@ async function main() {
     console.log("[migrate] no migrations/ directory — nothing to do.");
     return;
   }
-  // An app with no schema of its own must not pay for a database connection.
   if (pendingMigrations(entries, []).length === 0) {
     console.log("[migrate] no migrations — nothing to do.");
     return;
   }
 
-  const pool = new pg.Pool({ connectionString: databaseUrl, max: 1 });
+  const pool = new pg.Pool({
+    connectionString: databaseUrl,
+    max: 1,
+    ssl: { rejectUnauthorized: false },
+  });
   const client = await pool.connect();
   try {
     await client.query(
@@ -57,7 +86,6 @@ async function main() {
       const text = await readFile(join(migrationsDir, name), "utf8");
       try {
         await client.query("BEGIN");
-        // pg's simple-query protocol runs a whole multi-statement file at once.
         await client.query(text);
         await client.query("INSERT INTO _migrations (name) VALUES ($1)", [name]);
         await client.query("COMMIT");
@@ -66,7 +94,7 @@ async function main() {
         try {
           await client.query("ROLLBACK");
         } catch {
-          // ROLLBACK fails when the connection died — keep the original error.
+          /* keep original */
         }
         throw err;
       }
@@ -82,7 +110,6 @@ async function main() {
 
 main().catch((err) => {
   console.error("[migrate] failed:", err?.message || err);
-  // pg errors carry the context needed to debug a bad SQL file.
   for (const key of ["code", "detail", "hint", "position", "where"]) {
     if (err?.[key] != null) console.error(`[migrate]   ${key}: ${err[key]}`);
   }
