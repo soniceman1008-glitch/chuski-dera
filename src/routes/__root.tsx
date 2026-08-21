@@ -6,7 +6,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { CartDrawer } from "@/components/cart-drawer";
 import { FloatActions } from "@/components/float-actions";
 import { VoicePrime } from "@/lib/choice-voice";
-import { CatalogProvider } from "@/lib/catalog-store";
+import { CatalogProvider, CatalogStatusBanner } from "@/lib/catalog-store";
 import appCss from "../styles.css?url";
 
 const APP_NAME = "Chuski Dera";
@@ -58,6 +58,7 @@ function RootDocument() {
           <CatalogProvider>
             <div className="flex min-h-dvh flex-col">
               {chrome && <SiteHeader />}
+              {chrome && <CatalogStatusBanner />}
               <Outlet />
               {chrome && <SiteFooter />}
             </div>

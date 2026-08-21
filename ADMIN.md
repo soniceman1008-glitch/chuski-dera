@@ -1,28 +1,39 @@
-# Chuski Dera — Admin
+# Chuski Dera — Admin + Neon
 
-The public website stays open. No login is needed to browse or order.
+Public site stays open. No login is needed to browse or order.
 
-## Open the dashboard
+## 1. Neon database (required for live save)
 
-Go to **/admin** on the same site. A sign-in screen opens there (**/login** also works).
+Do this once. Do not paste the connection string into GitHub, chat, or the website.
 
-## First-time setup
+1. Open [https://console.neon.tech](https://console.neon.tech) and sign up / sign in.
+2. **New Project** → name it `chuski-dera` → region closest to you → Create.
+3. On the project dashboard click **Connect**.
+4. Keep **Connection pooling** ON.
+5. Copy the connection string only. It looks like `postgresql://…@….neon.tech/neondb?sslmode=require`.
 
-1. Choose **Sign up** and create an email + password (8+ characters).
-2. That first account becomes the **owner**.
-3. You land on the dashboard: Overview, Menu, Orders, Customers, Settings.
+## 2. Put it on Vercel (secret)
 
-Google and X sign-in also work. Same rule: first account is owner.
+1. Open [https://vercel.com/tayyab-mehmood/chuski-dera/settings/environment-variables](https://vercel.com/tayyab-mehmood/chuski-dera/settings/environment-variables)
+2. Key: `DATABASE_URL`
+3. Value: the Neon string (paste once, never share it)
+4. Environments: **Production** (and Preview if you want)
+5. Save.
+6. Deployments → latest → **Redeploy** (or wait for the next git deploy).
+
+After redeploy the first request creates tables and seeds the menu.
+
+## 3. Open the dashboard
+
+Go to **/admin**. Sign up with email + password (8+ characters). The first account is the owner.
 
 ## Daily use
 
-- **Menu** — add / edit / delete categories and items. Uncheck **Available** to hide an item from the customer menu immediately.
-- **Orders** — new checkout orders appear here. Update status: new → pending → confirmed → preparing → delivered (or cancelled).
-- **Customers** — search by name or phone and open order history.
+- **Menu** — add / edit / delete items. Price, description, image URL, availability. Uncheck **Available** to hide an item on the customer site.
+- **Orders** — checkout tickets land here.
+- **Customers** — search by name or phone.
 - **Settings**
-  - **Call** defaults to `03717400624` / `tel:+923717400624`.
-  - **WhatsApp** stays on `0313-9235645` / `+923139235645`. Do not mix them.
+  - **Call** `03717400624` / `tel:+923717400624`
+  - **WhatsApp** stays `0313-9235645` / `+923139235645`
 
-## Customer orders
-
-Checkout still sends WhatsApp. The same ticket is also saved so the dashboard can manage it.
+If `DATABASE_URL` is missing, the site shows an error instead of a fake default menu.
