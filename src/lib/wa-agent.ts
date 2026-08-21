@@ -24,7 +24,8 @@ function norm(s: string) {
 }
 
 export function detectLang(text: string, fallback?: AgentLang): AgentLang {
-  return detectVoiceLang(text, fallback ?? "ru");
+  const detected = detectVoiceLang(text, fallback ?? "ur");
+  return detected === "en" ? "en" : "ur";
 }
 
 export { isVoiceUnclear, clarifyLanguage } from "./voice-lang";
@@ -32,21 +33,22 @@ export { isVoiceUnclear, clarifyLanguage } from "./voice-lang";
 type Pack = { en: string; ur: string; ru: string; pa: string; hi: string };
 
 function t(lang: AgentLang, pack: Pack) {
-  return pack[lang] ?? pack.ru;
+  if (lang === "en") return pack.en;
+  return pack.ur;
 }
 
-export function greet(lang: AgentLang = "ru") {
+export function greet(lang: AgentLang = "ur") {
   return t(lang, {
     en: `Hi, welcome to ${RESTAURANT.name}. I can help with the menu, prices, or a delivery order. What would you like?`,
-    ur: `السلام علیکم، ${RESTAURANT.name} میں خوش آمدید۔ مینو، قیمت یا آرڈر میں مدد کر سکتی ہوں۔ آپ کیا لینا چاہیں گے؟`,
-    ru: `Assalamualaikum, ${RESTAURANT.name} mein khush amdeed. Menu, prices ya order mein help kar sakti hoon. Aap kya lena chahenge?`,
-    pa: `Sat sri akaal, ${RESTAURANT.name} vich ji aayan nu. Menu, price ya order vich madad kar sakdi aan. Tusi ki lena chahunde o?`,
-    hi: `Namaste, ${RESTAURANT.name} mein aapka swagat hai. Menu, keemat ya order mein madad kar sakti hoon. Aap kya lena chahenge?`,
+    ur: `السلام علیکم، ${RESTAURANT.name} میں خوش آمدید۔ مینو؁ قیمت یا آرڈر میں مدد کر سکتی ہوں۔ آپ کیا لینا چاہیں گے؟`,
+    ru: `السلام علیکم، ${RESTAURANT.name} میں خوش آمدید۔`,
+    pa: `السلام علیکم، ${RESTAURANT.name} میں خوش آمدید۔`,
+    hi: `السلام علیکم، ${RESTAURANT.name} میں خوش آمدید۔`,
   });
 }
 
 export const initialAgentState = (customer?: Partial<Customer>): AgentState => ({
-  lang: "ru",
+  lang: "ur",
   lines: [],
   customer: { name: customer?.name ?? "", phone: customer?.phone ?? "", address: customer?.address ?? "" },
   pendingId: null,
@@ -74,9 +76,9 @@ function summary(lines: CartLine[], lang: AgentLang) {
     return t(lang, {
       en: "Your order is empty.",
       ur: "آپ کا آرڈر خالی ہے۔",
-      ru: "Aap ka order khali hai.",
-      pa: "Tuhada order khali ae.",
-      hi: "Aapka order khali hai.",
+      ru: "آپ کا آرڈر خالی ہے۔",
+      pa: "آپ کا آرڈر خالی ہے۔",
+      hi: "آپ کا آرڈر خالی ہے۔",
     });
   }
   const rows = lines.map((line) => {
@@ -86,11 +88,11 @@ function summary(lines: CartLine[], lang: AgentLang) {
   const head = t(lang, {
     en: "Order so far:",
     ur: "اب تک کا آرڈر:",
-    ru: "Ab tak ka order:",
-    pa: "Hune tak da order:",
-    hi: "Ab tak ka order:",
+    ru: "اب تک کا آرڈر:",
+    pa: "اب تک کا آرڈر:",
+    hi: "اب تک کا آرڈر:",
   });
-  return `${head}\n${rows.filter(Boolean).join("\n")}\nTotal: ${formatRs(cartTotal(lines))}`;
+  return `${head}\n${rows.filter(Boolean).join("\n")}\nکل: ${formatRs(cartTotal(lines))}`;
 }
 
 function isYes(n: string) {
@@ -111,9 +113,9 @@ function askName(lang: AgentLang) {
   return t(lang, {
     en: "Please tell me your name for delivery.",
     ur: "براہِ کرم اپنا نام بتائیں۔",
-    ru: "Delivery ke liye apna naam bataein.",
-    pa: "Delivery lai apna naam dasso.",
-    hi: "Delivery ke liye apna naam bataiye.",
+    ru: "براہِ کرم اپنا نام بتائیں۔",
+    pa: "براہِ کرم اپنا نام بتائیں۔",
+    hi: "براہِ کرم اپنا نام بتائیں۔",
   });
 }
 
@@ -121,9 +123,9 @@ function askPhone(lang: AgentLang) {
   return t(lang, {
     en: "And your phone number?",
     ur: "اپنا فون نمبر؟",
-    ru: "Phone number bataein.",
-    pa: "Phone number dasso.",
-    hi: "Phone number bataiye.",
+    ru: "اپنا فون نمبر؟",
+    pa: "اپنا فون نمبر؟",
+    hi: "اپنا فون نمبر؟",
   });
 }
 
@@ -131,9 +133,9 @@ function askAddress(lang: AgentLang) {
   return t(lang, {
     en: "What is the delivery address in Jhang?",
     ur: "جھنگ میں ڈیلیوری اڈریس؟",
-    ru: "Jhang mein delivery address bataein.",
-    pa: "Jhang vich delivery address dasso.",
-    hi: "Jhang mein delivery address bataiye.",
+    ru: "جھنگ میں ڈیلیوری اڈریس؟",
+    pa: "جھنگ میں ڈیلیوری اڈریس؟",
+    hi: "جھنگ میں ڈیلیوری اڈریس؟",
   });
 }
 
@@ -141,9 +143,9 @@ function askConfirm(s: AgentState) {
   return t(s.lang, {
     en: `${summary(s.lines, s.lang)}\n${s.customer.name}, ${s.customer.phone}, ${s.customer.address}. Confirm this order?`,
     ur: `${summary(s.lines, s.lang)}\n${s.customer.name}، ${s.customer.phone}، ${s.customer.address}۔ تصدیق کریں؟`,
-    ru: `${summary(s.lines, s.lang)}\n${s.customer.name}, ${s.customer.phone}, ${s.customer.address}. Confirm karun?`,
-    pa: `${summary(s.lines, s.lang)}\n${s.customer.name}, ${s.customer.phone}, ${s.customer.address}. Confirm karan?`,
-    hi: `${summary(s.lines, s.lang)}\n${s.customer.name}, ${s.customer.phone}, ${s.customer.address}. Confirm karun?`,
+    ru: `${summary(s.lines, s.lang)}\n${s.customer.name}، ${s.customer.phone}، ${s.customer.address}۔ تصدیق کریں؟`,
+    pa: `${summary(s.lines, s.lang)}\n${s.customer.name}، ${s.customer.phone}، ${s.customer.address}۔ تصدیق کریں؟`,
+    hi: `${summary(s.lines, s.lang)}\n${s.customer.name}، ${s.customer.phone}، ${s.customer.address}۔ تصدیق کریں؟`,
   });
 }
 
@@ -181,10 +183,10 @@ export function agentReply(
         messages: [
           t(lang, {
             en: "That number looks short. Please say an 11-digit Pakistani mobile number.",
-            ur: "نمبر مکمل نہیں آیا۔ کریب 11 انگیز نمبر بتائیں۔",
-            ru: "Number mukammal nahi laga. 11 digit mobile number bataein.",
-            pa: "Number pura nahi ae. 11 digit mobile dasso.",
-            hi: "Number pura nahi laga. 11 digit mobile bataiye.",
+            ur: "نمبر مکمل نہیں آیا۔ گیارہ گنے پاکستانی موبائل نمبر بتائیں۔",
+            ru: "نمبر مکمل نہیں آیا۔",
+            pa: "نمبر مکمل نہیں آیا۔",
+            hi: "نمبر مکمل نہیں آیا۔",
           }),
         ],
       };
@@ -207,9 +209,9 @@ export function agentReply(
           t(lang, {
             en: "Order confirmed. Opening WhatsApp for the kitchen ticket.",
             ur: "آرڈر تصدیق ہو گیا۔ واٹساپ کھل رہا ہوں۔",
-            ru: "Order confirm ho gaya. WhatsApp kitchen ticket khul raha hai.",
-            pa: "Order confirm ho gaya. WhatsApp ticket khul reha ae.",
-            hi: "Order confirm ho gaya. WhatsApp kitchen ticket khul raha hai.",
+            ru: "آرڈر تصدیق ہو گیا۔",
+            pa: "آرڈر تصدیق ہو گیا۔",
+            hi: "آرڈر تصدیق ہو گیا۔",
           }),
         ],
         sendWhatsApp: true,
@@ -222,9 +224,9 @@ export function agentReply(
           t(lang, {
             en: "Okay, not sent. Tell me what to change.",
             ur: "ٹھیک ہے، بھیجا نہیں ہوا۔ کیا بدلنا ہے؟",
-            ru: "Theek hai, send nahi kiya. Kya badalna hai?",
-            pa: "Theek ae, send nahi kita. Ki badalna ae?",
-            hi: "Theek hai, send nahi kiya. Kya badalna hai?",
+            ru: "ٹھیک ہے، بھیجا نہیں ہوا۔",
+            pa: "ٹھیک ہے، بھیجا نہیں ہوا۔",
+            hi: "ٹھیک ہے، بھیجا نہیں ہوا۔",
           }),
         ],
       };
@@ -242,9 +244,9 @@ export function agentReply(
           t(lang, {
             en: "Okay. What else would you like?",
             ur: "ٹھیک ہے۔ اور کیا چاہیے؟",
-            ru: "Theek hai. Aur kya chahiye?",
-            pa: "Theek ae. Hor ki chahida?",
-            hi: "Theek hai. Aur kya chahiye?",
+            ru: "ٹھیک ہے۔ اور کیا چاہیے؟",
+            pa: "ٹھیک ہے۔ اور کیا چاہیے؟",
+            hi: "ٹھیک ہے۔ اور کیا چاہیے؟",
           }),
         ],
       };
@@ -258,11 +260,11 @@ export function agentReply(
       state: s,
       messages: [
         t(lang, {
-          en: `Added ${q}\u00d7 ${item.name}.\n${summary(lines, lang)}\nAnything else, or shall I checkout?`,
+          en: `Added ${q}\u00d7 ${item.name}.`,
           ur: `${q}\u00d7 ${item.name} شامل ہو گیا۔\n${summary(lines, lang)}`,
-          ru: `${q}\u00d7 ${item.name} add ho gaya.\n${summary(lines, lang)}\nKuch aur, ya checkout?`,
-          pa: `${q}\u00d7 ${item.name} add ho gaya.\n${summary(lines, lang)}\nHor kujh, ya checkout?`,
-          hi: `${q}\u00d7 ${item.name} add ho gaya.\n${summary(lines, lang)}\nKuch aur, ya checkout?`,
+          ru: `${q}\u00d7 ${item.name} شامل ہو گیا۔\n${summary(lines, lang)}`,
+          pa: `${q}\u00d7 ${item.name} شامل ہو گیا۔\n${summary(lines, lang)}`,
+          hi: `${q}\u00d7 ${item.name} شامل ہو گیا۔\n${summary(lines, lang)}`,
         }),
       ],
     };
@@ -289,11 +291,11 @@ export function agentReply(
         state: s,
         messages: [
           t(lang, {
-            en: `Added ${q}\u00d7 ${item.name}.\n${summary(lines, lang)}\nAnything else?`,
+            en: `Added ${q}\u00d7 ${item.name}.`,
             ur: `${q}\u00d7 ${item.name} شامل ہو گیا۔\n${summary(lines, lang)}`,
-            ru: `${q}\u00d7 ${item.name} add ho gaya.\n${summary(lines, lang)}\nKuch aur chahiye?`,
-            pa: `${q}\u00d7 ${item.name} add ho gaya.\n${summary(lines, lang)}\nHor kujh chahida?`,
-            hi: `${q}\u00d7 ${item.name} add ho gaya.\n${summary(lines, lang)}\nKuch aur chahiye?`,
+            ru: `${q}\u00d7 ${item.name} شامل ہو گیا۔\n${summary(lines, lang)}`,
+            pa: `${q}\u00d7 ${item.name} شامل ہو گیا۔\n${summary(lines, lang)}`,
+            hi: `${q}\u00d7 ${item.name} شامل ہو گیا۔\n${summary(lines, lang)}`,
           }),
         ],
       };
@@ -303,11 +305,11 @@ export function agentReply(
       state: s,
       messages: [
         t(lang, {
-          en: `${item.name} is ${formatRs(item.price)}. ${item.blurb} Want to add it?`,
-          ur: `${item.name} ${formatRs(item.price)} ہے۔ ${item.blurb}`,
-          ru: `${item.name} ${formatRs(item.price)} hai. ${item.blurb} Add karoon?`,
-          pa: `${item.name} ${formatRs(item.price)} ae. ${item.blurb} Add karan?`,
-          hi: `${item.name} ${formatRs(item.price)} hai. ${item.blurb} Add karun?`,
+          en: `${item.name} is ${formatRs(item.price)}.`,
+          ur: `${item.name} ${formatRs(item.price)} ہے۔ ${item.blurb} شامل کروں؟`,
+          ru: `${item.name} ${formatRs(item.price)} ہے۔`,
+          pa: `${item.name} ${formatRs(item.price)} ہے۔`,
+          hi: `${item.name} ${formatRs(item.price)} ہے۔`,
         }),
       ],
     };
@@ -321,19 +323,18 @@ export function agentReply(
       state: s,
       messages: [
         t(lang, {
-          en: `We have ${cats}. Which category?`,
-          ur: `ہمارے پاس ${cats}۔`,
-          ru: `Hamare paas ${cats} hain. Konsi category?`,
-          pa: `Saade kol ${cats} ne. Kehri category?`,
-          hi: `Hamare paas ${cats} hain. Kaunsi category?`,
+          en: `We have ${cats}.`,
+          ur: `ہمارے پاس ${cats}۔ کون سی کیٹیگری؟`,
+          ru: `ہمارے پاس ${cats}۔`,
+          pa: `ہمارے پاس ${cats}۔`,
+          hi: `ہمارے پاس ${cats}۔`,
         }),
       ],
     };
   }
 
   if (/\b(where|address|location|kahan|kithe)\b/i.test(text)) {
-    const loc = `${RESTAURANT.address}. ${CALL_DISPLAY}`;
-    return { state: s, messages: [loc, loc, loc, loc, loc].slice(0, 1) };
+    return { state: s, messages: [`${RESTAURANT.address}۔ ${CALL_DISPLAY}`] };
   }
 
   if (/\b(hours|timing|time|kitne baje|open)\b/i.test(text)) {
@@ -342,10 +343,10 @@ export function agentReply(
       messages: [
         t(lang, {
           en: "We are open 12:00 PM to 12:00 AM.",
-          ur: "میں دوپہر 12 بجے رات گھر بجے کھلے ہیں۔",
-          ru: "Hum 12:00 PM se 12:00 AM tak khulay hain.",
-          pa: "Assi 12:00 PM ton 12:00 AM tak khulle haan.",
-          hi: "Hum 12:00 PM se 12:00 AM tak khule hain.",
+          ur: "ہم دوپہر 12 بجے سے رات 12 بجے تک کھلے ہیں۔",
+          ru: "ہم دوپہر 12 بجے سے رات 12 بجے تک کھلے ہیں۔",
+          pa: "ہم دوپہر 12 بجے سے رات 12 بجے تک کھلے ہیں۔",
+          hi: "ہم دوپہر 12 بجے سے رات 12 بجے تک کھلے ہیں۔",
         }),
       ],
     };
@@ -358,9 +359,9 @@ export function agentReply(
         t(lang, {
           en: `Call ${CALL_DISPLAY}.`,
           ur: `کال کریں ${CALL_DISPLAY}۔`,
-          ru: `Call karein ${CALL_DISPLAY}.`,
-          pa: `Call karo ${CALL_DISPLAY}.`,
-          hi: `Call kijiye ${CALL_DISPLAY}.`,
+          ru: `کال کریں ${CALL_DISPLAY}۔`,
+          pa: `کال کریں ${CALL_DISPLAY}۔`,
+          hi: `کال کریں ${CALL_DISPLAY}۔`,
         }),
       ],
     };
@@ -370,11 +371,11 @@ export function agentReply(
     state: s,
     messages: [
       t(lang, {
-        en: `I can share Chuski Dera menu prices or take an order. What do you need?`,
-        ur: `میں چسکی ڈیرہ کے مینو سے مدد کر سکتی ہوں۔ آپ کیا پوچھنا چاہتے ہیں؟`,
-        ru: `Main Chuski Dera ke menu se price ya order mein help kar sakti hoon. Aap kya poochna chahte hain?`,
-        pa: `Main Chuski Dera de menu ton price ya order vich madad kar sakdi aan. Tusi ki puchna chahunde o?`,
-        hi: `Main Chuski Dera ke menu se keemat ya order mein madad kar sakti hoon. Aap kya poochna chahte hain?`,
+        en: `I can share Chuski Dera menu prices or take an order.`,
+        ur: "میں چسکی ڈیرہ کے مینو سے مدد کر سکتی ہوں۔ آپ کیا پوچنا چاہتے ہیں؟",
+        ru: "میں چسکی ڈیرہ کے مینو سے مدد کر سکتی ہوں۔",
+        pa: "میں چسکی ڈیرہ کے مینو سے مدد کر سکتی ہوں۔",
+        hi: "میں چسکی ڈیرہ کے مینو سے مدد کر سکتی ہوں۔",
       }),
     ],
   };
