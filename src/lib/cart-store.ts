@@ -10,6 +10,8 @@ export type Customer = {
   address: string;
 };
 
+export type PricedItem = { id: string; name: string; price: number; image?: string; blurb?: string };
+
 type CartState = {
   lines: CartLine[];
   customer: Customer;
@@ -66,9 +68,13 @@ export function itemCount(lines: CartLine[]) {
   return lines.reduce((sum, line) => sum + line.qty, 0);
 }
 
-export function cartTotal(lines: CartLine[]) {
+export function resolveCartItem(id: string, catalog?: PricedItem[] | null) {
+  return catalog?.find((item) => item.id === id) ?? findItem(id) ?? null;
+}
+
+export function cartTotal(lines: CartLine[], catalog?: PricedItem[] | null) {
   return lines.reduce((sum, line) => {
-    const item = findItem(line.id);
+    const item = resolveCartItem(line.id, catalog);
     return item ? sum + item.price * line.qty : sum;
   }, 0);
 }
