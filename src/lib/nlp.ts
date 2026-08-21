@@ -15,9 +15,6 @@ export type NlpIntent =
   | "chat";
 
 const SPELL: [RegExp, string][] = [
-  [/\u0632\u0646\u06af\u0631|\u0632\u0646\u062c\u0631/g, "zinger"],
-  [/\u0628\u0631\u06af\u0631/g, "burger"],
-  [/\u0634\u0627\u0648\u0631\u0645\u0627|\u0634\u0627\u0648\u0631\u0645\u06c1/g, "shawarma"],
   [/\b(singer|ginger|finger|zingerh|zingar|jinger|zingr)\b/g, "zinger"],
   [/\b(berger|bargar|burgr|burgar)\b/g, "burger"],
   [/\b(shwarma|shawerma|shavarma|shaorma|showarma|shewarma)\b/g, "shawarma"],
@@ -117,13 +114,10 @@ export function nlpQty(text: string): number | null {
 }
 
 export function nlpSpeakable(text: string): string {
-  return text
-    .replace(/[\u0600-\u06FF]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  return text.replace(/\s+/g, " ").trim();
 }
 
-export function analyzeUtterance(text: string, fallback: VoiceLang = "ru") {
+export function analyzeUtterance(text: string, fallback: VoiceLang = "ur") {
   const clean = nlpClean(text);
   return {
     raw: text.trim(),
