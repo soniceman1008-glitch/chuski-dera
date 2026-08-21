@@ -1,27 +1,21 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react";
-
-const CALL_HREF = "tel:+923139235654";
-const CALL_LABEL = "Call 03139235654";
+import type { AnchorHTMLAttributes, ReactNode } from "react";
+import { useRestaurant } from "@/lib/catalog-store";
+import { RESTAURANT } from "@/lib/menu";
 
 export function CallLink({
   className,
   children,
   ...rest
 }: { className?: string; children: ReactNode } & Omit<
-  ButtonHTMLAttributes<HTMLButtonElement>,
-  "type" | "onClick" | "aria-label"
+  AnchorHTMLAttributes<HTMLAnchorElement>,
+  "href" | "aria-label"
 >) {
+  const shop = useRestaurant();
+  const tel = (shop.callTel || RESTAURANT.callTel).replace(/^tel:/, "");
+  const label = `Call ${shop.callDisplay || RESTAURANT.callDisplay}`;
   return (
-    <button
-      {...rest}
-      type="button"
-      aria-label={CALL_LABEL}
-      className={className}
-      onClick={() => {
-        window.location.href = CALL_HREF;
-      }}
-    >
+    <a {...rest} href={`tel:${tel}`} aria-label={label} className={className}>
       {children}
-    </button>
+    </a>
   );
 }
