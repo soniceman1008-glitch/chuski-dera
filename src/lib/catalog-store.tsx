@@ -1,6 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { RESTAURANT } from "@/lib/menu";
-import { getPublicCatalog } from "@/lib/server/public-catalog";
+import { CATEGORIES, FOOD_CATEGORIES, MENU, RESTAURANT } from "@/lib/menu";
 import { subscribeCatalogSync } from "@/lib/catalog-sync";
 import type { CatalogCategory, CatalogItem, RestaurantSettings } from "@/lib/types";
 
@@ -18,6 +17,30 @@ const waitingSettings: RestaurantSettings = {
   waTel: RESTAURANT.phoneTel,
   mapsQuery: RESTAURANT.mapsQuery,
 };
+
+function staticItems(): CatalogItem[] {
+  return MENU.map((item, i) => ({
+    id: item.id,
+    name: item.name,
+    blurb: item.blurb,
+    price: item.price,
+    category: item.category,
+    image: item.image,
+    featured: Boolean(item.featured),
+    promo: Boolean(item.promo),
+    available: true,
+    sortOrder: i,
+  }));
+}
+
+function staticCategories(): CatalogCategory[] {
+  return CATEGORIES.filter((c) => c.id !== "all").map((c, i) => ({
+    id: c.id,
+    label: c.label,
+    sortOrder: i,
+    isFood: FOOD_CATEGORIES.includes(c.id as (typeof FOOD_CATEGORIES)[number]),
+  }));
+}
 
 type Catalog = {
   settings: RestaurantSettings;
@@ -38,49 +61,25 @@ const CatalogContext = createContext<Catalog>({
 });
 
 export function CatalogProvider({ children }: { children: ReactNode }) {
-  const [settings, setSettings] = useState(waitingSettings);
+  const [settings] = useState(waitingSettings);
   const [categories, setCategories] = useState<CatalogCategory[]>([]);
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [ready, setReady] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
     const bump = () => setTick((n) => n + 1);
-    const onVis = () => {
-      if (document.visibilityState === "visible") bump();
-    };
-    document.addEventListener("visibilitychange", onVis);
     const unsub = subscribeCatalogSync((msg) => {
       if (msg === "catalog") bump();
     });
-    const id = window.setInterval(bump, 3000);
-    return () => {
-      document.removeEventListener("visibilitychange", onVis);
-      unsub();
-      window.clearInterval(id);
-    };
+    return () => unsub();
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    void getPublicCatalog()
-      .then((data) => {
-        if (cancelled) return;
-        setSettings(data.settings);
-        setCategories(data.categories);
-        setItems(data.items);
-        setError(null);
-        setReady(true);
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        setError(err instanceof Error ? err.message : "Menu load fail");
-        setReady(true);
-      });
-    return () => {
-      cancelled = true;
-    };
+    setCategories(staticCategories());
+    setItems(staticItems());
+    setReady(true);
   }, [tick]);
 
   const value = useMemo(
@@ -92,20 +91,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
 }
 
 export function CatalogStatusBanner() {
-  const { ready, error } = useCatalog();
-  if (!ready) {
-    return (
-      <p className="border-b border-border bg-elevated px-4 py-2 text-center text-xs text-muted">
-        Loading live menu…
-      </p>
-    );
-  }
-  if (!error) return null;
-  return (
-    <p className="border-b border-border bg-elevated px-4 py-3 text-center text-sm text-primary">
-      {error}
-    </p>
-  );
+  return null;
 }
 
 export function useCatalog() {
