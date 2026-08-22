@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { transcribeAudio } from "@/lib/server/stt";
+import { groqKeyPresent, transcribeAudio } from "@/lib/server/stt";
 import { clientIpFromHeaders, rateLimit } from "@/lib/server/rate-limit";
 
 const MAX_BYTES = 4 * 1024 * 1024;
 const ALLOWED_TYPE = /^(audio\/|video\/webm|application\/octet-stream|$)/i;
+const ALLOWED_NAME = /\.(webm|ogg|oga|mp3|mp4|m4a|wav|mpeg)$/i;
 
-async function handle(request: Request) {
+async function handlePost(request: Request) {
   const ip = clientIpFromHeaders(request.headers);
   const limited = rateLimit(`transcribe:${ip}`, 8, 60_000);
   if (!limited.ok) {
@@ -33,7 +34,7 @@ async function handle(request: Request) {
   if (file.size > MAX_BYTES) {
     return Response.json({ error: "Audio file too large." }, { status: 413 });
   }
-  if (file.type && !ALLOWED_TYPE.test(file.type)) {
+  if (file.type && !ALLOWED_TYPE.test(file.type) && !ALLOWED_NAME.test(file.name || "")) {
     return Response.json({ error: "Audio file invalid hai." }, { status: 400 });
   }
   try {
@@ -48,7 +49,8 @@ async function handle(request: Request) {
 export const Route = createFileRoute("/api/transcribe")({
   server: {
     handlers: {
-      POST: ({ request }) => handle(request),
+      GET: () => Response.json({ groqConfigured: groqKeyPresent() }),
+      POST: ({ request }) => handlePost(request),
     },
   },
 });
