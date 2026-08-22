@@ -39,6 +39,17 @@ function logStt(event: string, extra?: Record<string, string | number | boolean>
   console.error("[stt]", event, extra ?? {});
 }
 
+function safeErr(err: unknown) {
+  const name = err instanceof Error ? err.name : "Error";
+  const raw = err instanceof Error ? err.message : "";
+  const msg = raw.replace(/gsk_[a-zA-Z0-9]+/gi, "[redacted]").replace(/Bearer\s+\S+/gi, "[redacted]").slice(0, 80);
+  const cause =
+    err instanceof Error && err.cause instanceof Error
+      ? err.cause.name
+      : "";
+  return { name, msg, cause };
+}
+
 export async function transcribeAudio(
   file: File,
 ): Promise<{ ok: true; text: string } | { ok: false; error: string; status: number }> {
@@ -48,10 +59,8 @@ export async function transcribeAudio(
     return { ok: false, status: 503, error: MSG_MISSING };
   }
 
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  const blob = new Blob([bytes], { type: file.type || "application/octet-stream" });
   const body = new FormData();
-  body.append("file", blob, fileName(file));
+  body.append("file", file, fileName(file));
   body.append("model", "whisper-large-v3");
   body.append("response_format", "json");
   body.append("temperature", "0");
@@ -62,11 +71,9 @@ export async function transcribeAudio(
       method: "POST",
       headers: { Authorization: `Bearer ${key}` },
       body,
-      signal: AbortSignal.timeout(20_000),
     });
   } catch (err) {
-    const name = err instanceof Error ? err.name : "Error";
-    logStt("fetch_failed", { name });
+    logStt("fetch_failed", safeErr(err));
     return { ok: false, status: 503, error: MSG_DOWN };
   }
 
