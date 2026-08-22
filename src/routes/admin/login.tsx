@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { adminLogin, getAdminSession } from "@/lib/server/admin-session";
 
@@ -11,14 +11,14 @@ function AdminLoginPage() {
   const [busy, setBusy] = useState(false);
   const [configured, setConfigured] = useState(true);
 
-  useState(() => {
+  useEffect(() => {
     void getAdminSession()
       .then((s) => {
         setConfigured(s.configured);
         if (s.authenticated) void navigate({ to: "/admin/menu" });
       })
       .catch(() => setConfigured(false));
-  });
+  }, [navigate]);
 
   async function onLogin(e: FormEvent) {
     e.preventDefault();
