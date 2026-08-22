@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { RESTAURANT } from "@/lib/menu";
-import { getPublicCatalog } from "@/lib/server/catalog";
+import { getPublicCatalog } from "@/lib/server/public-catalog";
 import { subscribeCatalogSync } from "@/lib/catalog-sync";
 import type { CatalogCategory, CatalogItem, RestaurantSettings } from "@/lib/types";
 
