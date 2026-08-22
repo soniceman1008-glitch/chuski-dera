@@ -1,8 +1,8 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Link, Outlet, useRouterState } from "@tanstack/react-router";
+import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { Bell, LayoutDashboard, Menu, Phone, Settings, ShoppingBag, Users, X } from "lucide-react";
-import { UserButton } from "@/lib/auth/gates";
 import { LogoMark } from "@/components/logo-mark";
+import { adminLogout, getAdminSession } from "@/lib/server/admin-session";
 import { newOrderCount } from "@/lib/server/orders";
 import { subscribeCatalogSync } from "@/lib/catalog-sync";
 
@@ -17,11 +17,40 @@ const NAV = [
 
 export function AdminShell({ children }: { children?: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const navigate = useNavigate();
+  const isLogin = pathname === "/admin/login";
+  const [auth, setAuth] = useState<"loading" | "yes" | "no">("loading");
   const [open, setOpen] = useState(false);
   const [fresh, setFresh] = useState(0);
   const [flash, setFlash] = useState(false);
 
   useEffect(() => {
+    if (isLogin) {
+      setAuth("yes");
+      return;
+    }
+    let cancelled = false;
+    void getAdminSession()
+      .then((s) => {
+        if (cancelled) return;
+        if (s.authenticated) setAuth("yes");
+        else {
+          setAuth("no");
+          void navigate({ to: "/admin/login" });
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setAuth("no");
+        void navigate({ to: "/admin/login" });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isLogin, navigate, pathname]);
+
+  useEffect(() => {
+    if (auth !== "yes" || isLogin) return;
     let last = 0;
     let first = true;
     async function tick() {
@@ -44,13 +73,25 @@ export function AdminShell({ children }: { children?: ReactNode }) {
       window.clearInterval(id);
       unsub();
     };
-  }, []);
+  }, [auth, isLogin]);
 
   useEffect(() => {
     if (!flash) return;
     const t = window.setTimeout(() => setFlash(false), 6000);
     return () => window.clearTimeout(t);
   }, [flash]);
+
+  if (isLogin) {
+    return <>{children ?? <Outlet />}</>;
+  }
+
+  if (auth === "loading" || auth === "no") {
+    return (
+      <main className="grid min-h-dvh place-items-center bg-bg text-sm text-muted">
+        {auth === "loading" ? "Checking admin access…" : "Redirecting to login…"}
+      </main>
+    );
+  }
 
   const nav = (
     <nav className="flex flex-col gap-1 p-3">
@@ -112,7 +153,15 @@ export function AdminShell({ children }: { children?: ReactNode }) {
               <Link to="/" className="text-sm text-muted hover:text-fg">
                 View site
               </Link>
-              <UserButton />
+              <button
+                type="button"
+                className="text-sm text-muted hover:text-fg"
+                onClick={() => {
+                  void adminLogout().then(() => navigate({ to: "/admin/login" }));
+                }}
+              >
+                Log out
+              </button>
             </div>
           </header>
           <div className="flex-1 p-4 sm:p-6">{children ?? <Outlet />}</div>
