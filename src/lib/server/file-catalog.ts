@@ -1,7 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { CATEGORIES, FOOD_CATEGORIES, MENU, RESTAURANT } from "@/lib/menu";
-import { assertAdmin } from "@/lib/server/admin-session";
 import type { CatalogCategory, CatalogItem, RestaurantSettings } from "@/lib/types";
 
 type Store = { items: CatalogItem[] };
@@ -153,7 +152,8 @@ async function mirrorDeleteToDb(id: string) {
 }
 
 export const getFileAdminCatalog = createServerFn({ method: "GET" }).handler(async () => {
-  assertAdmin();
+  const { assertAdmin } = await import("./admin-session");
+  await assertAdmin();
   try {
     const { databaseConfigured, getSql } = await import("@/lib/db");
     if (databaseConfigured) {
@@ -207,7 +207,8 @@ export const saveFileMenuItem = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data }) => {
-    assertAdmin();
+    const { assertAdmin } = await import("./admin-session");
+    await assertAdmin();
     const saved = fileSaveItem(data);
     const row = store().items.find((i) => i.id === saved.id);
     if (row) await mirrorSaveToDb(row);
@@ -217,7 +218,8 @@ export const saveFileMenuItem = createServerFn({ method: "POST" })
 export const deleteFileMenuItem = createServerFn({ method: "POST" })
   .validator((d: unknown) => z.object({ id: z.string().min(1) }).parse(d))
   .handler(async ({ data }) => {
-    assertAdmin();
+    const { assertAdmin } = await import("./admin-session");
+    await assertAdmin();
     const result = fileDeleteItem(data.id);
     await mirrorDeleteToDb(data.id);
     return result;
