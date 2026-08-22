@@ -64,7 +64,7 @@ export function isAdminAuthenticated() {
 
 export function assertAdmin() {
   if (!isAdminAuthenticated()) {
-    throw new Error("Unauthorized — admin login required");
+    throw Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 }
 
