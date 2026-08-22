@@ -4,6 +4,11 @@ import { databaseConfigured, getSql } from "@/lib/db";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { seedIfEmpty } from "./seed";
 
+async function requireAdmin() {
+  const { assertAdmin } = await import("./admin-session");
+  await assertAdmin();
+}
+
 export async function requireStaff(userId: string) {
   if (!databaseConfigured) return "owner";
   const sql = await getSql();
@@ -21,6 +26,7 @@ export async function requireStaff(userId: string) {
 export const ensureStaff = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
+    await requireAdmin();
     const role = await requireStaff(context.userId);
     if (!role) return { ok: false as const, role: null };
     return { ok: true as const, role };
@@ -29,6 +35,7 @@ export const ensureStaff = createServerFn({ method: "POST" })
 export const listStaff = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
+    await requireAdmin();
     if (!(await requireStaff(context.userId))) throw new Error("Forbidden");
     const sql = await getSql();
     return sql<{ userId: string; role: string; email: string | null; name: string | null }>`
@@ -44,6 +51,7 @@ export const addStaffByEmail = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((d: unknown) => z.object({ email: z.string().email() }).parse(d))
   .handler(async ({ context, data }) => {
+    await requireAdmin();
     const role = await requireStaff(context.userId);
     if (role !== "owner") throw new Error("Only the owner can add staff");
     const sql = await getSql();
