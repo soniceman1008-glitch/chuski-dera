@@ -1,9 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { getSql } from "@/lib/db";
-import { authMiddleware } from "@/lib/auth/middleware";
 import { seedIfEmpty } from "./seed";
-import { requireStaff } from "./staff";
 import { fileCatalog } from "./file-catalog";
 import type { CatalogCategory, CatalogItem, RestaurantSettings } from "@/lib/types";
 import {
@@ -12,6 +10,11 @@ import {
   sanitizeWaDisplay,
   sanitizeWaTel,
 } from "@/lib/phone";
+
+async function requireAdmin() {
+  const { assertAdmin } = await import("./admin-session");
+  await assertAdmin();
+}
 
 function num(v: unknown) {
   return typeof v === "number" ? v : Number(v);
@@ -58,7 +61,6 @@ function mapCat(row: Record<string, unknown>): CatalogCategory {
   };
 }
 
-/** Always safe — never crash the public site if Neon is down. */
 export const getPublicCatalog = createServerFn({ method: "GET" }).handler(async () => {
   try {
     const sql = await getSql();
@@ -82,6 +84,7 @@ export const getPublicCatalog = createServerFn({ method: "GET" }).handler(async 
 });
 
 export const getAdminCatalog = createServerFn({ method: "GET" }).handler(async () => {
+  await requireAdmin();
   try {
     const sql = await getSql();
     await seedIfEmpty(sql);
@@ -95,8 +98,8 @@ export const getAdminCatalog = createServerFn({ method: "GET" }).handler(async (
         items: items.map(mapItem),
       };
     }
-  } catch {
-    /* use static menu */
+  } catch (e) {
+    if (e instanceof Response) throw e;
   }
   return fileCatalog(true);
 });
@@ -126,6 +129,7 @@ function slug(name: string) {
 export const saveMenuItem = createServerFn({ method: "POST" })
   .validator((d: unknown) => ItemSchema.parse(d))
   .handler(async ({ data }) => {
+    await requireAdmin();
     const { fileSaveItem } = await import("./file-catalog");
     const saved = fileSaveItem(data);
     try {
@@ -166,6 +170,7 @@ export const saveMenuItem = createServerFn({ method: "POST" })
 export const deleteMenuItem = createServerFn({ method: "POST" })
   .validator((d: unknown) => z.object({ id: z.string().min(1) }).parse(d))
   .handler(async ({ data }) => {
+    await requireAdmin();
     const { fileDeleteItem } = await import("./file-catalog");
     fileDeleteItem(data.id);
     try {
@@ -186,6 +191,7 @@ const CatSchema = z.object({
 export const saveCategory = createServerFn({ method: "POST" })
   .validator((d: unknown) => CatSchema.parse(d))
   .handler(async ({ data }) => {
+    await requireAdmin();
     try {
       const sql = await getSql();
       const id = data.id?.trim() || slug(data.label);
@@ -208,6 +214,7 @@ export const saveCategory = createServerFn({ method: "POST" })
 export const deleteCategory = createServerFn({ method: "POST" })
   .validator((d: unknown) => z.object({ id: z.string().min(1) }).parse(d))
   .handler(async ({ data }) => {
+    await requireAdmin();
     try {
       const sql = await getSql();
       await sql`delete from categories where id = ${data.id}`;
@@ -234,6 +241,7 @@ const SettingsSchema = z.object({
 export const saveSettings = createServerFn({ method: "POST" })
   .validator((d: unknown) => SettingsSchema.parse(d))
   .handler(async ({ data }) => {
+    await requireAdmin();
     try {
       const sql = await getSql();
       await sql`
