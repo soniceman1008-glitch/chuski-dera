@@ -6,13 +6,13 @@ import { join } from "node:path";
 
 /** One restaurant-friendly female house voice family. */
 function voiceFor(lang) {
-  const key = String(lang || "ru").toLowerCase();
+  const key = String(lang || "ur").toLowerCase();
   if (key === "ur") return "ur-PK-UzmaNeural";
   if (key === "hi") return "hi-IN-SwaraNeural";
   if (key === "pa") return "hi-IN-SwaraNeural";
   if (key === "ru") return "ur-PK-UzmaNeural";
-  if (key === "en") return "en-IN-NeerjaNeural";
-  return "en-IN-NeerjaNeural";
+  if (key === "en") return "ur-PK-UzmaNeural";
+  return "ur-PK-UzmaNeural";
 }
 
 function cloneReady() {
@@ -59,7 +59,7 @@ async function synthesizeClonedSpeech(text) {
  * @param {string} [lang]
  * @returns {Promise<Buffer>}
  */
-async function synthesizeHouseSpeech(text, lang = "ru") {
+async function synthesizeHouseSpeech(text, lang = "ur") {
   const voice = voiceFor(lang);
   const out = join(tmpdir(), `chuski-tts-${randomBytes(6).toString("hex")}.mp3`);
   const py = `
@@ -101,7 +101,7 @@ asyncio.run(main())
  * @param {string} [lang]
  * @returns {Promise<Buffer>}
  */
-export async function synthesizeAgentSpeech(text, lang = "ru") {
+export async function synthesizeAgentSpeech(text, lang = "ur") {
   const clean = String(text ?? "")
     .replace(/\s+/g, " ")
     .trim()
