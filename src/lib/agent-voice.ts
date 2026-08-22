@@ -32,19 +32,14 @@ function isMaleVoice(v: SpeechSynthesisVoice) {
   );
 }
 
-function scoreVoice(v: SpeechSynthesisVoice, lang: VoiceLang) {
+function scoreVoice(v: SpeechSynthesisVoice, _lang: VoiceLang) {
   const hay = `${v.name} ${v.lang}`.toLowerCase();
   let n = 0;
   if (isFemaleVoice(v)) n += 8;
   if (isMaleVoice(v)) n -= 12;
-  if (lang === "en") {
-    if (/en-in|india/.test(hay)) n += 5;
-    else if (/^en/.test(v.lang)) n += 3;
-    return n;
-  }
-  if (/ur/.test(hay)) n += 8;
-  if (/pakistan|urdu|uzma/.test(hay)) n += 7;
-  if (/hi-in|hindi|swara|heera/.test(hay)) n += 5;
+  if (/ur-pk|urdu|uzma|pakistan/.test(hay)) n += 20;
+  else if (/hi-in|hindi|swara|heera|ananya|aditi/.test(hay)) n += 10;
+  else if (/^en/.test(v.lang.toLowerCase())) n -= 6;
   return n;
 }
 
@@ -56,9 +51,7 @@ function pickVoice(lang: VoiceLang): SpeechSynthesisVoice | null {
   return [...voices].sort((a, b) => scoreVoice(b, lang) - scoreVoice(a, lang))[0] ?? null;
 }
 
-function ttsLang(lang: VoiceLang) {
-  if (lang === "en") return "en-IN";
-  if (lang === "hi") return "hi-IN";
+function ttsLang(_lang?: VoiceLang) {
   return "ur-PK";
 }
 
@@ -95,25 +88,55 @@ async function speakBrowser(script: string, lang: VoiceLang) {
   });
 }
 
-export async function speakAgentReply(text: string, lang: VoiceLang): Promise<string | null> {
+async function playBlob(blob: Blob) {
+  const url = URL.createObjectURL(blob);
+  await new Promise<void>((resolve) => {
+    const audio = new Audio(url);
+    current = audio;
+    const done = () => {
+      if (current === audio) current = null;
+      resolve();
+    };
+    audio.onended = done;
+    audio.onerror = done;
+    void audio.play().catch(done);
+    window.setTimeout(done, 20_000);
+  });
+  return url;
+}
+
+export async function speakAgentReply(text: string, _lang: VoiceLang): Promise<string | null> {
   if (typeof window === "undefined") return null;
   stopAgentVoice();
-  await speakBrowser(voiceScript(text), lang);
+  const script = voiceScript(text);
+  try {
+    const res = await fetch("/api/agent-tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: script, lang: "ur" }),
+    });
+    if (res.ok) {
+      const blob = await res.blob();
+      if (blob.size > 200) return playBlob(blob);
+    }
+  } catch {
+    /* browser Urdu/Hindi fallback */
+  }
+  await speakBrowser(script, "ur");
   return null;
 }
 
 export function permissionHelp(): string {
   return [
-    "Microphone allow nahi hua.",
-    "Chrome/Edge: address bar ke lock/tune icon → Site settings → Microphone → Allow.",
-    "Safari iPhone: Settings → Safari → Microphone → Allow, phir page refresh karein.",
-    "Android Chrome: site ke ⋮ menu → Permissions → Microphone.",
+    "مائیکروفون اجازت نہیں ملی۔",
+    "Chrome/Edge: ایڈریس بار کے لاک آئیکن سے مائیکروفون Allow کریں۔",
+    "آئی فون: Settings → Safari → Microphone → Allow، پھر صفحہ ریفریش کریں۔",
   ].join("\n");
 }
 
 export async function requestMicPermission(): Promise<{ ok: boolean; error?: string }> {
   if (typeof window === "undefined" || !navigator.mediaDevices?.getUserMedia) {
-    return { ok: false, error: "Is browser mein microphone support nahi hai. Chrome use karein." };
+    return { ok: false, error: "اس براؤزر میں مائیکروفون نہیں چلتا۔ Chrome استعمال کریں۔" };
   }
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
@@ -127,13 +150,13 @@ export async function requestMicPermission(): Promise<{ ok: boolean; error?: str
       return { ok: false, error: permissionHelp() };
     }
     if (name === "NotFoundError") {
-      return { ok: false, error: "Koi microphone nahi mila. Headset ya phone mic check karein." };
+      return { ok: false, error: "مائیکروفون نہیں ملا۔ ہیڈسیٹ یا فون مائیک چیک کریں۔" };
     }
     if (name === "NotReadableError") {
-      return { ok: false, error: "Microphone kisi aur app mein busy hai. Usko band karke try karein." };
+      return { ok: false, error: "مائیکروفون کسی اور ایپ میں لگا ہے۔ اسے بند کر کے دوبارہ کوشش کریں۔" };
     }
     if (name === "SecurityError") {
-      return { ok: false, error: "Microphone ke liye HTTPS chahiye." };
+      return { ok: false, error: "مائیکروفون کے لیے محفوظ HTTPS چاہیے۔" };
     }
     return { ok: false, error: permissionHelp() };
   }
@@ -231,7 +254,7 @@ export function createVoiceSession(_lang: VoiceLang): VoiceSession {
             audioBlob = new Blob(chunks, { type: recorder?.mimeType || "audio/webm" });
             audioUrl = URL.createObjectURL(audioBlob);
             if (durationMs < 700) {
-              error = "Bohot short clip. Mic dabao, 2-3 second bolo, phir roko.";
+              error = "کلپ بہت چھوٹی ہے۔ مائیک دبائیں، دو تین سیکنڈ بولیں، پھر روکیں۔";
             } else {
               try {
                 transcript = nlpClean(await transcribeBlob(audioBlob));
