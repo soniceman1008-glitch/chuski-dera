@@ -128,10 +128,17 @@ function createNeonSql(): Promise<Sql> {
     types.setTypeParser(OID_INTERVAL, identity);
     const connectionString = getDatabaseUrl();
     if (!connectionString) throw new Error(DB_MISSING_MSG);
+    let neonUrl = connectionString;
+    try {
+      const parsed = new URL(connectionString);
+      parsed.searchParams.set("sslmode", "verify-full");
+      neonUrl = parsed.toString();
+    } catch {
+      neonUrl = connectionString;
+    }
     const pool = new Pool({
-      connectionString,
+      connectionString: neonUrl,
       max: 4,
-      ssl: { rejectUnauthorized: false },
     });
     await applyNeonMigrations(pool);
     return toSql(async <T>(text: string, params: unknown[]) => {
