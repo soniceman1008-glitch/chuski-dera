@@ -144,6 +144,7 @@ export type VoiceCaptureResult = {
   audioUrl: string | null;
   audioBlob: Blob | null;
   durationMs: number;
+  error?: string;
 };
 
 function pickMime(): string {
@@ -153,9 +154,9 @@ function pickMime(): string {
 }
 
 async function transcribeBlob(blob: Blob): Promise<string> {
-  const file = new File([blob], blob.type.includes("mp4") ? "speech.mp4" : "speech.webm", {
-    type: blob.type || "audio/webm",
-  });
+  const type = blob.type || "audio/webm";
+  const name = type.includes("mp4") ? "speech.m4a" : "speech.webm";
+  const file = new File([blob], name, { type });
   const form = new FormData();
   form.append("file", file);
   const res = await fetch("/api/transcribe", { method: "POST", body: form });
@@ -166,7 +167,9 @@ async function transcribeBlob(blob: Blob): Promise<string> {
     data = {};
   }
   if (!res.ok) throw new Error(data.error || "Awaaz samajh nahi aayi.");
-  return String(data.text ?? "").trim();
+  const text = String(data.text ?? "").trim();
+  if (!text) throw new Error("Awaaz samajh nahi aayi. Mic ke qareeb 2-3 second dheere bolo.");
+  return text;
 }
 
 export type VoiceSession = {
@@ -205,7 +208,7 @@ export function createVoiceSession(_lang: VoiceLang): VoiceSession {
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunks.push(e.data);
       };
-      recorder.start(250);
+      recorder.start(200);
       startedAt = Date.now();
     },
 
@@ -223,21 +226,27 @@ export function createVoiceSession(_lang: VoiceLang): VoiceSession {
           let audioBlob: Blob | null = null;
           let audioUrl: string | null = null;
           let transcript = "";
+          let error: string | undefined;
           if (chunks.length) {
             audioBlob = new Blob(chunks, { type: recorder?.mimeType || "audio/webm" });
             audioUrl = URL.createObjectURL(audioBlob);
-            try {
-              transcript = nlpClean(await transcribeBlob(audioBlob));
-            } catch {
-              transcript = "";
+            if (durationMs < 700) {
+              error = "Bohot short clip. Mic dabao, 2-3 second bolo, phir roko.";
+            } else {
+              try {
+                transcript = nlpClean(await transcribeBlob(audioBlob));
+              } catch (e) {
+                error = e instanceof Error ? e.message : "Awaaz samajh nahi aayi.";
+              }
             }
           }
           recorder = null;
-          resolve({ transcript, audioUrl, audioBlob, durationMs });
+          resolve({ transcript, audioUrl, audioBlob, durationMs, error });
         };
         if (recorder && recorder.state !== "inactive") {
           recorder.onstop = () => void finish();
           try {
+            recorder.requestData();
             recorder.stop();
           } catch {
             void finish();
