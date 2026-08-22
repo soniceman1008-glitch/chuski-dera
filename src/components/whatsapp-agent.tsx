@@ -73,12 +73,12 @@ export function WhatsAppAgent({
     if (!booted) {
       const next = initialAgentState(customer);
       setState(next);
-      const hello = greet("ru");
+      const hello = greet("ur");
       const id = idRef.current++;
-      setMsgs([{ id, role: "bot", text: hello, voice: true, lang: "ru" }]);
+      setMsgs([{ id, role: "bot", text: hello, voice: true, lang: "ur" }]);
       setBooted(true);
       setPhase("speaking");
-      void speakAgentReply(hello, "ru").then((url) => {
+      void speakAgentReply(hello, "ur").then((url) => {
         if (url) {
           urlsRef.current.push(url);
           setMsgs((m) => m.map((row) => (row.id === id ? { ...row, audioUrl: url } : row)));
@@ -128,16 +128,12 @@ export function WhatsAppAgent({
 
     if (viaVoice && isVoiceUnclear(value)) {
       if (audioUrl) push("user", "", true, audioUrl, stateRef.current.lang);
-      const ask = clarifyLanguage(stateRef.current.lang);
+      const ask = clarifyLanguage("ur");
       window.setTimeout(() => {
         void (async () => {
-          const id = push("bot", ask, true, null, stateRef.current.lang);
+          const id = push("bot", ask, true, null, "ur");
           setPhase("speaking");
-          const url = await speakAgentReply(ask, stateRef.current.lang);
-          if (url) {
-            urlsRef.current.push(url);
-            setMsgs((m) => m.map((row) => (row.id === id ? { ...row, audioUrl: url } : row)));
-          }
+          await speakAgentReply(ask, "ur");
           setPhase("idle");
         })();
       }, 200);
@@ -146,11 +142,8 @@ export function WhatsAppAgent({
 
     if (!value) return;
 
-    if (viaVoice) {
-      push("user", value, true, audioUrl, stateRef.current.lang);
-    } else {
-      push("user", value, false);
-    }
+    if (viaVoice) push("user", value, true, audioUrl, "ur");
+    else push("user", value, false);
     setDraft("");
     const result = agentReply(stateRef.current, value);
     setState(result.state);
@@ -158,13 +151,9 @@ export function WhatsAppAgent({
     window.setTimeout(() => {
       void (async () => {
         for (const line of result.messages) {
-          const id = push("bot", line, true, null, result.state.lang);
+          push("bot", line, true, null, "ur");
           setPhase("speaking");
-          const url = await speakAgentReply(line, result.state.lang);
-          if (url) {
-            urlsRef.current.push(url);
-            setMsgs((m) => m.map((row) => (row.id === id ? { ...row, audioUrl: url } : row)));
-          }
+          await speakAgentReply(line, "ur");
         }
         setPhase("idle");
         if (result.sendWhatsApp && result.state.lines.length) {
@@ -197,16 +186,16 @@ export function WhatsAppAgent({
     setPhase("asking");
     const perm = await requestMicPermission();
     if (!perm.ok) {
-      setDenied(perm.error ?? "Mic permission chahiye.");
+      setDenied(perm.error ?? "Mic allow karein.");
       setPhase("idle");
       return;
     }
-    const session = createVoiceSession(stateRef.current.lang);
+    const session = createVoiceSession("ur");
     sessionRef.current = session;
     try {
       await session.start();
     } catch {
-      setDenied("Microphone start nahi ho saka. Permission check karein.");
+      setDenied("Microphone start nahi ho saka.");
       setPhase("idle");
       return;
     }
@@ -234,7 +223,7 @@ export function WhatsAppAgent({
     }
     const result = await session.stop();
     if (!result.audioUrl && !result.transcript) {
-      setDenied("Kuch record nahi hua. Mic dabakar dobara bolein.");
+      setDenied("آواز ریکارڈ نہیں ہوئی۔ دوبارہ بولیں۔");
       setPhase("idle");
       return;
     }
@@ -278,24 +267,13 @@ export function WhatsAppAgent({
     previewAudio.current = null;
     setPreviewPlaying(false);
     setPhase("processing");
-    if (clip.transcript && clip.transcript !== "(voice)") {
-      const lang = detectLang(clip.transcript, stateRef.current.lang);
-      stateRef.current = { ...stateRef.current, lang };
-      setState(stateRef.current);
-    }
     send(clip.transcript || "(voice)", true, clip.audioUrl);
   }
 
   async function replayBot(msg: ChatMsg) {
     stopAgentVoice();
     setPhase("speaking");
-    if (msg.audioUrl) {
-      const a = new Audio(msg.audioUrl);
-      a.setAttribute("playsinline", "true");
-      await a.play().catch(() => speakAgentReply(msg.text, msg.lang ?? stateRef.current.lang));
-    } else {
-      await speakAgentReply(msg.text, msg.lang ?? stateRef.current.lang);
-    }
+    await speakAgentReply(msg.text, "ur");
     setPhase("idle");
   }
 
@@ -317,16 +295,9 @@ export function WhatsAppAgent({
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold">{RESTAURANT.name}</p>
-            <p className="truncate text-xs text-white/80">
-              {AGENT_PHONE_DISPLAY} · AI · text & voice
-            </p>
+            <p className="truncate text-xs text-white/80">{AGENT_PHONE_DISPLAY} · اردو ایجنٹ</p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="grid size-11 place-items-center rounded-full hover:bg-white/10"
-            aria-label="Close chat"
-          >
+          <button type="button" onClick={onClose} className="grid size-11 place-items-center rounded-full hover:bg-white/10" aria-label="Close chat">
             <X className="size-5" />
           </button>
         </header>
@@ -341,43 +312,21 @@ export function WhatsAppAgent({
                     : "max-w-[85%] rounded-lg rounded-tl-sm bg-[#1f2c34] px-3 py-2 text-sm leading-relaxed text-[#e9edef]"
                 }
               >
-                {msg.role === "bot" || msg.voice ? (
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] tracking-wide text-white/60 uppercase">
-                      {msg.role === "user" ? "Voice message" : "Voice reply"}
-                    </span>
-                    {msg.role === "bot" ? (
-                      <button
-                        type="button"
-                        onClick={() => void replayBot(msg)}
-                        className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-1 text-[11px] text-white"
-                        aria-label="Play voice reply"
-                      >
-                        <Play className="size-3" /> Play
-                      </button>
-                    ) : null}
+                {msg.role === "bot" ? (
+                  <div className="mb-1">
+                    <button type="button" onClick={() => void replayBot(msg)} className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-1 text-[11px] text-white">
+                      <Play className="size-3" /> سنو
+                    </button>
                   </div>
                 ) : null}
-                {msg.audioUrl ? (
-                  <audio controls src={msg.audioUrl} className="mt-1 max-w-full" preload="metadata" />
-                ) : null}
-                {msg.role === "bot" || msg.voice ? null : <p className="whitespace-pre-wrap">{msg.text}</p>}
+                {msg.text ? <p className="whitespace-pre-wrap">{msg.text}</p> : null}
               </div>
             </div>
           ))}
-
-          {denied && (
-            <div className="rounded-lg bg-[#1f2c34] px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap text-[#ffd7d7]">
-              {denied}
-            </div>
-          )}
-
-          {phase === "asking" && <p className="text-center text-xs text-white/50">Microphone permission…</p>}
-          {phase === "recording" && (
-            <p className="text-center text-xs text-red-300">Recording {formatTimer(elapsed)} · Stop dabakar preview</p>
-          )}
-          {phase === "processing" && <p className="text-center text-xs text-white/50">AI sun rahi hai…</p>}
-          {phase === "speaking" && <p className="text-center text-xs text-white/50">AI bol rahi hai…</p>}
+          {denied && <div className="rounded-lg bg-[#1f2c34] px-3 py-2 text-xs text-[#ffd7d7]">{denied}</div>}
+          {phase === "recording" && <p className="text-center text-xs text-red-300">ریکارڈنگ {formatTimer(elapsed)}</p>}
+          {phase === "processing" && <p className="text-center text-xs text-white/50">سن رہی ہوں…</p>}
+          {phase === "speaking" && <p className="text-center text-xs text-white/50">بول رہی ہوں…</p>}
         </div>
 
         {phase === "recording" || phase === "preview" ? (
@@ -385,56 +334,25 @@ export function WhatsAppAgent({
             {phase === "recording" ? (
               <div className="flex items-center gap-2">
                 <span className="size-2 animate-pulse rounded-full bg-red-500" />
-                <p className="flex-1 text-sm text-white">Recording {formatTimer(elapsed)}</p>
-                <button
-                  type="button"
-                  onClick={() => void stopRecord()}
-                  className="inline-flex h-10 items-center gap-1 rounded-lg bg-red-500 px-3 text-sm font-semibold text-white"
-                >
-                  <Square className="size-3.5" /> Stop
+                <p className="flex-1 text-sm text-white">{formatTimer(elapsed)}</p>
+                <button type="button" onClick={() => void stopRecord()} className="inline-flex h-10 items-center rounded-lg bg-red-500 px-3 text-sm font-semibold text-white">
+                  <Square className="size-3.5" /> روکیں
                 </button>
-                <button
-                  type="button"
-                  onClick={cancelRecord}
-                  className="grid size-10 place-items-center rounded-lg bg-[#2a3942] text-white"
-                  aria-label="Cancel recording"
-                >
+                <button type="button" onClick={cancelRecord} className="grid size-10 place-items-center rounded-lg bg-[#2a3942] text-white">
                   <X className="size-4" />
                 </button>
               </div>
             ) : (
               <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={togglePreviewPlay}
-                  className="grid size-10 place-items-center rounded-full bg-[#2a3942] text-white"
-                  aria-label={previewPlaying ? "Pause preview" : "Replay recording"}
-                >
+                <button type="button" onClick={togglePreviewPlay} className="grid size-10 place-items-center rounded-full bg-[#2a3942] text-white">
                   {previewPlaying ? <Pause className="size-4" /> : <Play className="size-4" />}
                 </button>
-                <p className="min-w-0 flex-1 text-xs text-white/70">Preview · send, retry, ya cancel</p>
-                <button
-                  type="button"
-                  onClick={() => void beginRecord()}
-                  className="grid size-10 place-items-center rounded-lg bg-[#2a3942] text-white"
-                  aria-label="New recording"
-                >
+                <p className="min-w-0 flex-1 text-xs text-white/70">{preview?.transcript || "بھیجیں"}</p>
+                <button type="button" onClick={() => void beginRecord()} className="grid size-10 place-items-center rounded-lg bg-[#2a3942] text-white">
                   <RotateCcw className="size-4" />
                 </button>
-                <button
-                  type="button"
-                  onClick={cancelRecord}
-                  className="grid size-10 place-items-center rounded-lg bg-[#2a3942] text-white"
-                  aria-label="Cancel"
-                >
-                  <X className="size-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={sendPreview}
-                  className="inline-flex h-10 items-center gap-1 rounded-lg bg-[#25d366] px-3 text-sm font-semibold text-[#052e16]"
-                >
-                  <Send className="size-4" /> Send
+                <button type="button" onClick={sendPreview} className="inline-flex h-10 items-center gap-1 rounded-lg bg-[#25d366] px-3 text-sm font-semibold text-[#052e16]">
+                  <Send className="size-4" /> بھیجیں
                 </button>
               </div>
             )}
@@ -444,38 +362,21 @@ export function WhatsAppAgent({
             className="flex items-end gap-2 bg-[#1f2c34] p-2"
             onSubmit={(e) => {
               e.preventDefault();
-              if (busy) return;
-              send(draft, false);
+              if (!busy) send(draft, false);
             }}
           >
-            <button
-              type="button"
-              onClick={() => void beginRecord()}
-              disabled={busy}
-              aria-label="Voice message"
-              className="grid size-11 shrink-0 place-items-center rounded-full bg-[#2a3942] text-white disabled:opacity-50"
-            >
+            <button type="button" onClick={() => void beginRecord()} disabled={busy} className="grid size-11 shrink-0 place-items-center rounded-full bg-[#2a3942] text-white disabled:opacity-50">
               <Mic className="size-5" />
             </button>
             <textarea
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  if (!busy) send(draft, false);
-                }
-              }}
               rows={1}
-              placeholder={busy ? "AI busy…" : "Message"}
+              placeholder="پیغام لکھیں…"
               className="max-h-28 min-h-11 flex-1 resize-none rounded-lg bg-[#2a3942] px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/40"
             />
-            <button
-              type="submit"
-              disabled={busy}
-              className="inline-flex h-11 shrink-0 items-center rounded-lg bg-[#25d366] px-4 text-sm font-semibold text-[#052e16] disabled:opacity-50"
-            >
-              Send
+            <button type="submit" disabled={busy} className="inline-flex h-11 shrink-0 items-center rounded-lg bg-[#25d366] px-4 text-sm font-semibold text-[#052e16] disabled:opacity-50">
+              بھیجیں
             </button>
           </form>
         )}
