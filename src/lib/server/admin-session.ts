@@ -1,5 +1,4 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getCookie, getRequestHeader, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 
 const COOKIE = "chuski_admin";
@@ -7,7 +6,8 @@ const MAX_AGE_SEC = 7 * 24 * 60 * 60;
 
 function adminSecret(): string | undefined {
   try {
-    const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
+    const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process
+      ?.env;
     const v = env?.ADMIN_PASSWORD?.trim() || env?.BETTER_AUTH_SECRET?.trim();
     return v || undefined;
   } catch {
@@ -39,11 +39,12 @@ async function verifyToken(token: string | undefined, secret: string): Promise<b
   return ok;
 }
 
-function readCookie(): string | undefined {
+async function readCookie(): Promise<string | undefined> {
+  const server = await import("@tanstack/react-start/server");
   try {
-    return getCookie(COOKIE);
+    return server.getCookie(COOKIE);
   } catch {
-    const header = getRequestHeader("cookie") ?? "";
+    const header = server.getRequestHeader("cookie") ?? "";
     for (const part of header.split(/;\s*/)) {
       const eq = part.indexOf("=");
       if (eq === -1) continue;
@@ -56,7 +57,7 @@ function readCookie(): string | undefined {
 export async function isAdminAuthenticated(): Promise<boolean> {
   const secret = adminSecret();
   if (!secret) return false;
-  return verifyToken(readCookie(), secret);
+  return verifyToken(await readCookie(), secret);
 }
 
 export async function assertAdmin() {
@@ -81,6 +82,7 @@ export const adminLogin = createServerFn({ method: "POST" })
       throw new Error("Galat password");
     }
     const token = await makeToken(secret);
+    const { setResponseHeader } = await import("@tanstack/react-start/server");
     setResponseHeader(
       "Set-Cookie",
       [
@@ -96,6 +98,7 @@ export const adminLogin = createServerFn({ method: "POST" })
   });
 
 export const adminLogout = createServerFn({ method: "POST" }).handler(async () => {
+  const { setResponseHeader } = await import("@tanstack/react-start/server");
   setResponseHeader(
     "Set-Cookie",
     `${COOKIE}=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0`,
