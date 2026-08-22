@@ -4,6 +4,7 @@ import { getSql } from "@/lib/db";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { seedIfEmpty } from "./seed";
 import { requireStaff } from "./staff";
+import { fileCatalog } from "./file-catalog";
 import type { CatalogCategory, CatalogItem, RestaurantSettings } from "@/lib/types";
 import {
   sanitizeCallDisplay,
@@ -58,34 +59,43 @@ function mapCat(row: Record<string, unknown>): CatalogCategory {
 }
 
 export const getPublicCatalog = createServerFn({ method: "GET" }).handler(async () => {
-  const sql = await getSql();
-  await seedIfEmpty(sql);
-  const settingsRows = await sql<Record<string, unknown>>`select * from settings where id = ${"main"}`;
-  const cats = await sql<Record<string, unknown>>`select * from categories order by sort_order, label`;
-  const items = await sql<Record<string, unknown>>`
-    select * from menu_items where available = true order by sort_order, name
-  `;
-  return {
-    settings: mapSettings(settingsRows[0] ?? {}),
-    categories: cats.map(mapCat),
-    items: items.map(mapItem),
-  };
+  try {
+    const sql = await getSql();
+    await seedIfEmpty(sql);
+    const settingsRows = await sql<Record<string, unknown>>`select * from settings where id = ${"main"}`;
+    const cats = await sql<Record<string, unknown>>`select * from categories order by sort_order, label`;
+    const items = await sql<Record<string, unknown>>`
+      select * from menu_items where available = true order by sort_order, name
+    `;
+    if (!items.length) return fileCatalog(false);
+    return {
+      settings: mapSettings(settingsRows[0] ?? {}),
+      categories: cats.map(mapCat),
+      items: items.map(mapItem),
+    };
+  } catch {
+    return fileCatalog(false);
+  }
 });
 
 export const getAdminCatalog = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
     if (!(await requireStaff(context.userId))) throw new Error("Forbidden");
-    const sql = await getSql();
-    await seedIfEmpty(sql);
-    const settingsRows = await sql<Record<string, unknown>>`select * from settings where id = ${"main"}`;
-    const cats = await sql<Record<string, unknown>>`select * from categories order by sort_order, label`;
-    const items = await sql<Record<string, unknown>>`select * from menu_items order by sort_order, name`;
-    return {
-      settings: mapSettings(settingsRows[0] ?? {}),
-      categories: cats.map(mapCat),
-      items: items.map(mapItem),
-    };
+    try {
+      const sql = await getSql();
+      await seedIfEmpty(sql);
+      const settingsRows = await sql<Record<string, unknown>>`select * from settings where id = ${"main"}`;
+      const cats = await sql<Record<string, unknown>>`select * from categories order by sort_order, label`;
+      const items = await sql<Record<string, unknown>>`select * from menu_items order by sort_order, name`;
+      return {
+        settings: mapSettings(settingsRows[0] ?? {}),
+        categories: cats.map(mapCat),
+        items: items.map(mapItem),
+      };
+    } catch {
+      return fileCatalog(true);
+    }
   });
 
 const ItemSchema = z.object({
@@ -105,7 +115,6 @@ function slug(name: string) {
     name
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|$/g, "")
       .replace(/^-|-$/g, "")
       .slice(0, 48) || `item-${Date.now()}`
   );
@@ -223,10 +232,10 @@ export const saveSettings = createServerFn({ method: "POST" })
         address = ${data.address.trim()},
         city = ${data.city.trim()},
         hours = ${data.hours ?? ""},
-        call_display = ${sanitizeCallDisplay()},
-        call_tel = ${sanitizeCallTel()},
-        wa_display = ${sanitizeWaDisplay()},
-        wa_tel = ${sanitizeWaTel()},
+        call_display = ${sanitizeCallDisplay(data.callDisplay)},
+        call_tel = ${sanitizeCallTel(data.callTel)},
+        wa_display = ${sanitizeWaDisplay(data.waDisplay)},
+        wa_tel = ${sanitizeWaTel(data.waTel)},
         maps_query = ${data.mapsQuery.trim()},
         updated_at = now()
       where id = ${"main"}
