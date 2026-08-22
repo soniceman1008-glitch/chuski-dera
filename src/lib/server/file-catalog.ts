@@ -1,14 +1,10 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { CATEGORIES, FOOD_CATEGORIES, MENU, RESTAURANT } from "@/lib/menu";
-import { databaseConfigured, getSql } from "@/lib/db";
 import type { CatalogCategory, CatalogItem, RestaurantSettings } from "@/lib/types";
 
 type Store = { items: CatalogItem[] };
 
-const FILE = join(process.cwd(), "data", "catalog.json");
 const g = globalThis as typeof globalThis & { __chuskiFileCatalog__?: Store };
 
 function defaultItems(): CatalogItem[] {
@@ -26,22 +22,42 @@ function defaultItems(): CatalogItem[] {
   }));
 }
 
-export function loadFromDisk(): CatalogItem[] | null {
+/** Only call from server handlers — never at module top-level. */
+function catalogPath(): string {
   try {
-    const raw = JSON.parse(readFileSync(FILE, "utf8")) as { items?: CatalogItem[] };
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { join } = require("node:path") as typeof import("node:path");
+    const cwd =
+      typeof process !== "undefined" && typeof process.cwd === "function" ? process.cwd() : ".";
+    return join(cwd, "data", "catalog.json");
+  } catch {
+    return "data/catalog.json";
+  }
+}
+
+function loadFromDisk(): CatalogItem[] | null {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { readFileSync } = require("node:fs") as typeof import("node:fs");
+    const raw = JSON.parse(readFileSync(catalogPath(), "utf8")) as { items?: CatalogItem[] };
     if (Array.isArray(raw?.items) && raw.items.length) return raw.items;
   } catch {
-    /* missing */
+    /* missing or browser */
   }
   return null;
 }
 
 function persist(items: CatalogItem[]) {
   try {
-    mkdirSync(dirname(FILE), { recursive: true });
-    writeFileSync(FILE, JSON.stringify({ items }, null, 2), "utf8");
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const fs = require("node:fs") as typeof import("node:fs");
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { dirname } = require("node:path") as typeof import("node:path");
+    const file = catalogPath();
+    fs.mkdirSync(dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify({ items }, null, 2), "utf8");
   } catch {
-    /* Vercel FS may be read-only */
+    /* Vercel FS / browser */
   }
 }
 
@@ -135,35 +151,24 @@ export function fileDeleteItem(id: string) {
   return { ok: true };
 }
 
-export const getFileAdminCatalog = createServerFn({ method: "GET" }).handler(async () => fileCatalog(true));
-
-async function mirrorSaveToDb(data: {
-  id: string;
-  name: string;
-  blurb: string;
-  price: number;
-  category: string;
-  image: string;
-  featured: boolean;
-  promo: boolean;
-  available: boolean;
-}) {
-  if (!databaseConfigured) return;
+async function mirrorSaveToDb(row: CatalogItem) {
   try {
+    const { databaseConfigured, getSql } = await import("@/lib/db");
+    if (!databaseConfigured) return;
     const sql = await getSql();
-    const existing = await sql<{ id: string }>`select id from menu_items where id = ${data.id}`;
+    const existing = await sql<{ id: string }>`select id from menu_items where id = ${row.id}`;
     if (existing[0]) {
       await sql`
         update menu_items set
-          name = ${data.name},
-          blurb = ${data.blurb},
-          price = ${data.price},
-          category_id = ${data.category},
-          image = ${data.image},
-          featured = ${data.featured},
-          promo = ${data.promo},
-          available = ${data.available}
-        where id = ${data.id}
+          name = ${row.name},
+          blurb = ${row.blurb},
+          price = ${row.price},
+          category_id = ${row.category},
+          image = ${row.image},
+          featured = ${row.featured},
+          promo = ${row.promo},
+          available = ${row.available}
+        where id = ${row.id}
       `;
     } else {
       const max = await sql<{ n: number }>`select coalesce(max(sort_order),0)::int as n from menu_items`;
@@ -171,8 +176,8 @@ async function mirrorSaveToDb(data: {
         insert into menu_items (
           id, name, blurb, price, category_id, image, featured, promo, available, sort_order
         ) values (
-          ${data.id}, ${data.name}, ${data.blurb}, ${data.price}, ${data.category},
-          ${data.image}, ${data.featured}, ${data.promo}, ${data.available}, ${Number(max[0]?.n) + 1}
+          ${row.id}, ${row.name}, ${row.blurb}, ${row.price}, ${row.category},
+          ${row.image}, ${row.featured}, ${row.promo}, ${row.available}, ${Number(max[0]?.n) + 1}
         )
       `;
     }
@@ -182,14 +187,17 @@ async function mirrorSaveToDb(data: {
 }
 
 async function mirrorDeleteToDb(id: string) {
-  if (!databaseConfigured) return;
   try {
+    const { databaseConfigured, getSql } = await import("@/lib/db");
+    if (!databaseConfigured) return;
     const sql = await getSql();
     await sql`delete from menu_items where id = ${id}`;
   } catch {
     /* DB optional */
   }
 }
+
+export const getFileAdminCatalog = createServerFn({ method: "GET" }).handler(async () => fileCatalog(true));
 
 export const saveFileMenuItem = createServerFn({ method: "POST" })
   .validator((d: unknown) =>
@@ -210,19 +218,7 @@ export const saveFileMenuItem = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const saved = fileSaveItem(data);
     const row = store().items.find((i) => i.id === saved.id);
-    if (row) {
-      await mirrorSaveToDb({
-        id: row.id,
-        name: row.name,
-        blurb: row.blurb,
-        price: row.price,
-        category: row.category,
-        image: row.image,
-        featured: row.featured,
-        promo: row.promo,
-        available: row.available,
-      });
-    }
+    if (row) await mirrorSaveToDb(row);
     return saved;
   });
 
