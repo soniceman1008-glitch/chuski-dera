@@ -10,73 +10,62 @@ function runtimeEnv(name: string): string | undefined {
   return trimmed ? trimmed : undefined;
 }
 
-type Target = { url: string; key: string; model: string };
-
-function whisperTargets(): Target[] {
-  const out: Target[] = [];
-  const groq = runtimeEnv("GROQ_API_KEY");
-  if (groq) {
-    out.push({
-      url: "https://api.groq.com/openai/v1/audio/transcriptions",
-      key: groq,
-      model: "whisper-large-v3",
-    });
-  }
-  const openai = runtimeEnv("OPENAI_API_KEY");
-  if (openai) {
-    out.push({
-      url: "https://api.openai.com/v1/audio/transcriptions",
-      key: openai,
-      model: "whisper-1",
-    });
-  }
-  return out;
+function groqKey(): string | undefined {
+  return runtimeEnv("GROQ_API_KEY");
 }
+
+/** Never return provider text — it can contain secrets. */
+const MSG_MISSING = "Voice abhi available nahi. Owner ko Groq key update karni hogi.";
+const MSG_INVALID = "Voice service configure nahi. Owner Vercel mein GROQ_API_KEY update karein.";
+const MSG_BUSY = "Voice busy hai. Thori dair baad try karo.";
+const MSG_DOWN = "Voice service temporarily down. Thori dair baad try karo.";
+const MSG_FAIL = "Awaaz samajh nahi aayi. Dobara bolo.";
 
 export async function transcribeAudio(
   file: File,
 ): Promise<{ ok: true; text: string } | { ok: false; error: string; status: number }> {
-  const targets = whisperTargets();
-  if (!targets.length) {
-    return {
-      ok: false,
-      status: 503,
-      error: "Voice key missing. Vercel mein GROQ_API_KEY add karein.",
-    };
+  const key = groqKey();
+  if (!key) {
+    return { ok: false, status: 503, error: MSG_MISSING };
   }
 
-  let last = "Whisper ne awaaz convert nahi ki.";
-  for (const target of targets) {
-    const body = new FormData();
-    body.append("file", file, file.name || "speech.webm");
-    body.append("model", target.model);
-    body.append("language", "ur");
-    body.append("response_format", "json");
-    body.append("temperature", "0");
+  const body = new FormData();
+  body.append("file", file, file.name || "speech.webm");
+  body.append("model", "whisper-large-v3");
+  body.append("language", "ur");
+  body.append("response_format", "json");
+  body.append("temperature", "0");
 
-    const res = await fetch(target.url, {
+  let res: Response;
+  try {
+    res = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
       method: "POST",
-      headers: { Authorization: `Bearer ${target.key}` },
+      headers: { Authorization: `Bearer ${key}` },
       body,
+      signal: AbortSignal.timeout(20_000),
     });
-
-    let data: { text?: string; error?: { message?: string } } = {};
-    try {
-      data = (await res.json()) as { text?: string; error?: { message?: string } };
-    } catch {
-      data = {};
-    }
-
-    if (res.ok) return { ok: true, text: String(data.text ?? "").trim() };
-    last = data.error?.message || last;
+  } catch {
+    return { ok: false, status: 503, error: MSG_DOWN };
   }
 
-  const invalid = /invalid api key|incorrect api key|unauthorized/i.test(last);
-  return {
-    ok: false,
-    status: 502,
-    error: invalid
-      ? "GROQ_API_KEY ghalat hai. Groq pe nayi key banao, Vercel mein purani delete karke nayi paste karo, phir Redeploy."
-      : last,
-  };
+  if (res.status === 401 || res.status === 403) {
+    console.error("[stt] Groq credentials rejected", res.status);
+    return { ok: false, status: 503, error: MSG_INVALID };
+  }
+  if (res.status === 429) {
+    return { ok: false, status: 429, error: MSG_BUSY };
+  }
+  if (res.status >= 500) {
+    return { ok: false, status: 503, error: MSG_DOWN };
+  }
+  if (!res.ok) {
+    return { ok: false, status: 502, error: MSG_FAIL };
+  }
+
+  try {
+    const data = (await res.json()) as { text?: string };
+    return { ok: true, text: String(data.text ?? "").trim() };
+  } catch {
+    return { ok: false, status: 502, error: MSG_FAIL };
+  }
 }
