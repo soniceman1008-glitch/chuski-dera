@@ -131,7 +131,7 @@ export function WhatsAppAgent({
       const ask = clarifyLanguage("ur");
       window.setTimeout(() => {
         void (async () => {
-          const id = push("bot", ask, true, null, "ur");
+          push("bot", ask, true, null, "ur");
           setPhase("speaking");
           await speakAgentReply(ask, "ur");
           setPhase("idle");
@@ -222,8 +222,9 @@ export function WhatsAppAgent({
       return;
     }
     const result = await session.stop();
+    if (result.error) setDenied(result.error);
     if (!result.audioUrl && !result.transcript) {
-      setDenied("آواز ریکارڈ نہیں ہوئی۔ دوبارہ بولیں۔");
+      setDenied(result.error ?? "آواز ریکارڈ نہیں ہوئی۔ دوبارہ بولیں۔");
       setPhase("idle");
       return;
     }
@@ -267,6 +268,18 @@ export function WhatsAppAgent({
     previewAudio.current = null;
     setPreviewPlaying(false);
     setPhase("processing");
+    if (clip.error && !clip.transcript) {
+      const ask = clip.error;
+      window.setTimeout(() => {
+        void (async () => {
+          push("bot", ask, true, null, "ur");
+          setPhase("speaking");
+          await speakAgentReply(ask, "ur");
+          setPhase("idle");
+        })();
+      }, 200);
+      return;
+    }
     send(clip.transcript || "(voice)", true, clip.audioUrl);
   }
 
@@ -347,7 +360,7 @@ export function WhatsAppAgent({
                 <button type="button" onClick={togglePreviewPlay} className="grid size-10 place-items-center rounded-full bg-[#2a3942] text-white">
                   {previewPlaying ? <Pause className="size-4" /> : <Play className="size-4" />}
                 </button>
-                <p className="min-w-0 flex-1 text-xs text-white/70">{preview?.transcript || "بھیجیں"}</p>
+                <p className="min-w-0 flex-1 text-xs text-white/70">{preview?.transcript || preview?.error || "بھیجیں"}</p>
                 <button type="button" onClick={() => void beginRecord()} className="grid size-10 place-items-center rounded-lg bg-[#2a3942] text-white">
                   <RotateCcw className="size-4" />
                 </button>
