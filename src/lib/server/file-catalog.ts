@@ -1,3 +1,5 @@
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { CATEGORIES, FOOD_CATEGORIES, MENU, RESTAURANT } from "@/lib/menu";
@@ -5,24 +7,51 @@ import type { CatalogCategory, CatalogItem, RestaurantSettings } from "@/lib/typ
 
 type Store = { items: CatalogItem[] };
 
+const FILE = join(process.cwd(), "data", "catalog.json");
 const g = globalThis as typeof globalThis & { __chuskiFileCatalog__?: Store };
 
+function defaultItems(): CatalogItem[] {
+  return MENU.map((item, i) => ({
+    id: item.id,
+    name: item.name,
+    blurb: item.blurb,
+    price: item.price,
+    category: item.category,
+    image: item.image,
+    featured: Boolean(item.featured),
+    promo: Boolean(item.promo),
+    available: true,
+    sortOrder: i,
+  }));
+}
+
+function loadFromDisk(): CatalogItem[] | null {
+  try {
+    const raw = JSON.parse(readFileSync(FILE, "utf8")) as { items?: CatalogItem[] };
+    if (Array.isArray(raw?.items) && raw.items.length) return raw.items;
+  } catch {
+    /* missing */
+  }
+  return null;
+}
+
+function persist(items: CatalogItem[]) {
+  try {
+    mkdirSync(dirname(FILE), { recursive: true });
+    writeFileSync(FILE, JSON.stringify({ items }, null, 2), "utf8");
+  } catch {
+    /* Vercel ephemeral FS — Neon covers production when DATABASE_URL is set */
+  }
+}
+
 function store(): Store {
+  const disk = loadFromDisk();
+  if (disk) {
+    g.__chuskiFileCatalog__ = { items: disk };
+    return g.__chuskiFileCatalog__;
+  }
   if (!g.__chuskiFileCatalog__) {
-    g.__chuskiFileCatalog__ = {
-      items: MENU.map((item, i) => ({
-        id: item.id,
-        name: item.name,
-        blurb: item.blurb,
-        price: item.price,
-        category: item.category,
-        image: item.image,
-        featured: Boolean(item.featured),
-        promo: Boolean(item.promo),
-        available: true,
-        sortOrder: i,
-      })),
-    };
+    g.__chuskiFileCatalog__ = { items: defaultItems() };
   }
   return g.__chuskiFileCatalog__;
 }
@@ -72,7 +101,11 @@ export function fileSaveItem(data: {
   const items = store().items;
   const id =
     data.id?.trim() ||
-    data.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48) ||
+    data.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 48) ||
     `item-${Date.now()}`;
   const next: CatalogItem = {
     id,
@@ -89,6 +122,7 @@ export function fileSaveItem(data: {
   const idx = items.findIndex((row) => row.id === id);
   if (idx >= 0) items[idx] = next;
   else items.push(next);
+  persist(items);
   return { id };
 }
 
@@ -96,6 +130,7 @@ export function fileDeleteItem(id: string) {
   const items = store().items;
   const idx = items.findIndex((row) => row.id === id);
   if (idx >= 0) items.splice(idx, 1);
+  persist(items);
   return { ok: true };
 }
 
