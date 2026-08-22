@@ -4,6 +4,11 @@ import { authMiddleware } from "@/lib/auth/middleware";
 import { requireStaff } from "./staff";
 import { voiceAgentStatus } from "./voice-agent";
 
+async function requireAdmin() {
+  const { assertAdmin } = await import("./admin-session");
+  await assertAdmin();
+}
+
 function num(v: unknown) {
   return typeof v === "number" ? v : Number(v);
 }
@@ -11,6 +16,7 @@ function num(v: unknown) {
 export const getVoiceDashboard = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
+    await requireAdmin();
     if (!(await requireStaff(context.userId))) throw new Error("Forbidden");
     const sql = await getSql();
     const status = voiceAgentStatus();
