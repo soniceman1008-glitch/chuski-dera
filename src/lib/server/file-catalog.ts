@@ -22,51 +22,7 @@ function defaultItems(): CatalogItem[] {
   }));
 }
 
-/** Only call from server handlers — never at module top-level. */
-function catalogPath(): string {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { join } = require("node:path") as typeof import("node:path");
-    const cwd =
-      typeof process !== "undefined" && typeof process.cwd === "function" ? process.cwd() : ".";
-    return join(cwd, "data", "catalog.json");
-  } catch {
-    return "data/catalog.json";
-  }
-}
-
-function loadFromDisk(): CatalogItem[] | null {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { readFileSync } = require("node:fs") as typeof import("node:fs");
-    const raw = JSON.parse(readFileSync(catalogPath(), "utf8")) as { items?: CatalogItem[] };
-    if (Array.isArray(raw?.items) && raw.items.length) return raw.items;
-  } catch {
-    /* missing or browser */
-  }
-  return null;
-}
-
-function persist(items: CatalogItem[]) {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const fs = require("node:fs") as typeof import("node:fs");
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { dirname } = require("node:path") as typeof import("node:path");
-    const file = catalogPath();
-    fs.mkdirSync(dirname(file), { recursive: true });
-    fs.writeFileSync(file, JSON.stringify({ items }, null, 2), "utf8");
-  } catch {
-    /* Vercel FS / browser */
-  }
-}
-
 function store(): Store {
-  const disk = loadFromDisk();
-  if (disk) {
-    g.__chuskiFileCatalog__ = { items: disk };
-    return g.__chuskiFileCatalog__;
-  }
   if (!g.__chuskiFileCatalog__) {
     g.__chuskiFileCatalog__ = { items: defaultItems() };
   }
@@ -139,7 +95,6 @@ export function fileSaveItem(data: {
   const idx = items.findIndex((row) => row.id === id);
   if (idx >= 0) items[idx] = next;
   else items.push(next);
-  persist(items);
   return { id };
 }
 
@@ -147,7 +102,6 @@ export function fileDeleteItem(id: string) {
   const items = store().items;
   const idx = items.findIndex((row) => row.id === id);
   if (idx >= 0) items.splice(idx, 1);
-  persist(items);
   return { ok: true };
 }
 
@@ -182,7 +136,7 @@ async function mirrorSaveToDb(row: CatalogItem) {
       `;
     }
   } catch {
-    /* DB optional */
+    /* ignore */
   }
 }
 
@@ -193,11 +147,46 @@ async function mirrorDeleteToDb(id: string) {
     const sql = await getSql();
     await sql`delete from menu_items where id = ${id}`;
   } catch {
-    /* DB optional */
+    /* ignore */
   }
 }
 
-export const getFileAdminCatalog = createServerFn({ method: "GET" }).handler(async () => fileCatalog(true));
+export const getFileAdminCatalog = createServerFn({ method: "GET" }).handler(async () => {
+  try {
+    const { databaseConfigured, getSql } = await import("@/lib/db");
+    if (databaseConfigured) {
+      const sql = await getSql();
+      const cats = await sql<Record<string, unknown>>`select * from categories order by sort_order, label`;
+      const items = await sql<Record<string, unknown>>`select * from menu_items order by sort_order, name`;
+      if (items.length) {
+        return {
+          settings: fileSettings(),
+          categories: cats.map((row) => ({
+            id: String(row.id),
+            label: String(row.label),
+            sortOrder: Number(row.sort_order) || 0,
+            isFood: Boolean(row.is_food),
+          })),
+          items: items.map((row) => ({
+            id: String(row.id),
+            name: String(row.name),
+            blurb: String(row.blurb ?? ""),
+            price: Number(row.price),
+            category: String(row.category_id),
+            image: String(row.image ?? ""),
+            featured: Boolean(row.featured),
+            promo: Boolean(row.promo),
+            available: Boolean(row.available),
+            sortOrder: Number(row.sort_order) || 0,
+          })),
+        };
+      }
+    }
+  } catch {
+    /* fall through */
+  }
+  return fileCatalog(true);
+});
 
 export const saveFileMenuItem = createServerFn({ method: "POST" })
   .validator((d: unknown) =>
