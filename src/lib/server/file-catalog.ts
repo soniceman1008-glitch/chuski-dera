@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { CATEGORIES, FOOD_CATEGORIES, MENU, RESTAURANT } from "@/lib/menu";
+import { databaseConfigured, getSql } from "@/lib/db";
 import type { CatalogCategory, CatalogItem, RestaurantSettings } from "@/lib/types";
 
 type Store = { items: CatalogItem[] };
@@ -25,7 +26,7 @@ function defaultItems(): CatalogItem[] {
   }));
 }
 
-function loadFromDisk(): CatalogItem[] | null {
+export function loadFromDisk(): CatalogItem[] | null {
   try {
     const raw = JSON.parse(readFileSync(FILE, "utf8")) as { items?: CatalogItem[] };
     if (Array.isArray(raw?.items) && raw.items.length) return raw.items;
@@ -40,7 +41,7 @@ function persist(items: CatalogItem[]) {
     mkdirSync(dirname(FILE), { recursive: true });
     writeFileSync(FILE, JSON.stringify({ items }, null, 2), "utf8");
   } catch {
-    /* Vercel ephemeral FS — Neon covers production when DATABASE_URL is set */
+    /* Vercel FS may be read-only */
   }
 }
 
@@ -136,6 +137,60 @@ export function fileDeleteItem(id: string) {
 
 export const getFileAdminCatalog = createServerFn({ method: "GET" }).handler(async () => fileCatalog(true));
 
+async function mirrorSaveToDb(data: {
+  id: string;
+  name: string;
+  blurb: string;
+  price: number;
+  category: string;
+  image: string;
+  featured: boolean;
+  promo: boolean;
+  available: boolean;
+}) {
+  if (!databaseConfigured) return;
+  try {
+    const sql = await getSql();
+    const existing = await sql<{ id: string }>`select id from menu_items where id = ${data.id}`;
+    if (existing[0]) {
+      await sql`
+        update menu_items set
+          name = ${data.name},
+          blurb = ${data.blurb},
+          price = ${data.price},
+          category_id = ${data.category},
+          image = ${data.image},
+          featured = ${data.featured},
+          promo = ${data.promo},
+          available = ${data.available}
+        where id = ${data.id}
+      `;
+    } else {
+      const max = await sql<{ n: number }>`select coalesce(max(sort_order),0)::int as n from menu_items`;
+      await sql`
+        insert into menu_items (
+          id, name, blurb, price, category_id, image, featured, promo, available, sort_order
+        ) values (
+          ${data.id}, ${data.name}, ${data.blurb}, ${data.price}, ${data.category},
+          ${data.image}, ${data.featured}, ${data.promo}, ${data.available}, ${Number(max[0]?.n) + 1}
+        )
+      `;
+    }
+  } catch {
+    /* DB optional */
+  }
+}
+
+async function mirrorDeleteToDb(id: string) {
+  if (!databaseConfigured) return;
+  try {
+    const sql = await getSql();
+    await sql`delete from menu_items where id = ${id}`;
+  } catch {
+    /* DB optional */
+  }
+}
+
 export const saveFileMenuItem = createServerFn({ method: "POST" })
   .validator((d: unknown) =>
     z
@@ -152,8 +207,29 @@ export const saveFileMenuItem = createServerFn({ method: "POST" })
       })
       .parse(d),
   )
-  .handler(async ({ data }) => fileSaveItem(data));
+  .handler(async ({ data }) => {
+    const saved = fileSaveItem(data);
+    const row = store().items.find((i) => i.id === saved.id);
+    if (row) {
+      await mirrorSaveToDb({
+        id: row.id,
+        name: row.name,
+        blurb: row.blurb,
+        price: row.price,
+        category: row.category,
+        image: row.image,
+        featured: row.featured,
+        promo: row.promo,
+        available: row.available,
+      });
+    }
+    return saved;
+  });
 
 export const deleteFileMenuItem = createServerFn({ method: "POST" })
   .validator((d: unknown) => z.object({ id: z.string().min(1) }).parse(d))
-  .handler(async ({ data }) => fileDeleteItem(data.id));
+  .handler(async ({ data }) => {
+    const result = fileDeleteItem(data.id);
+    await mirrorDeleteToDb(data.id);
+    return result;
+  });
