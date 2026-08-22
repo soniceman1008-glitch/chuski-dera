@@ -6,6 +6,11 @@ import { seedIfEmpty } from "./seed";
 import { requireStaff } from "./staff";
 import type { CustomerRow, OrderRow, OrderStatus } from "@/lib/types";
 
+async function requireAdmin() {
+  const { assertAdmin } = await import("./admin-session");
+  await assertAdmin();
+}
+
 const STATUSES: OrderStatus[] = ["new", "pending", "confirmed", "preparing", "delivered", "cancelled"];
 
 function num(v: unknown) {
@@ -105,6 +110,7 @@ export const placeOrder = createServerFn({ method: "POST" })
 export const getDashboard = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
+    await requireAdmin();
     if (!(await requireStaff(context.userId))) throw new Error("Forbidden");
     const sql = await getSql();
     await seedIfEmpty(sql);
@@ -144,6 +150,7 @@ export const listOrders = createServerFn({ method: "POST" })
     z.object({ status: z.enum(["all", ...STATUSES]).optional().default("all") }).parse(d ?? { status: "all" }),
   )
   .handler(async ({ context, data }) => {
+    await requireAdmin();
     if (!(await requireStaff(context.userId))) throw new Error("Forbidden");
     const sql = await getSql();
     const ids =
@@ -164,6 +171,7 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
     z.object({ id: z.number().int(), status: z.enum(STATUSES as [OrderStatus, ...OrderStatus[]]) }).parse(d),
   )
   .handler(async ({ context, data }) => {
+    await requireAdmin();
     if (!(await requireStaff(context.userId))) throw new Error("Forbidden");
     const sql = await getSql();
     await sql`update orders set status = ${data.status} where id = ${data.id}`;
@@ -174,6 +182,7 @@ export const listCustomers = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((d: unknown) => z.object({ q: z.string().optional().default("") }).parse(d ?? { q: "" }))
   .handler(async ({ context, data }) => {
+    await requireAdmin();
     if (!(await requireStaff(context.userId))) throw new Error("Forbidden");
     const sql = await getSql();
     const q = `%${(data.q ?? "").trim().toLowerCase()}%`;
@@ -206,7 +215,8 @@ export const listCustomers = createServerFn({ method: "POST" })
 export const customerOrders = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((d: unknown) => z.object({ id: z.number().int() }).parse(d))
-  .handler(async ({ context, data }) => {
+  .handler(async ({ data, context }) => {
+    await requireAdmin();
     if (!(await requireStaff(context.userId))) throw new Error("Forbidden");
     const sql = await getSql();
     const ids = await sql<{ id: number }>`select id from orders where customer_id = ${data.id} order by created_at desc`;
@@ -221,6 +231,7 @@ export const customerOrders = createServerFn({ method: "POST" })
 export const newOrderCount = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
+    await requireAdmin();
     if (!(await requireStaff(context.userId))) throw new Error("Forbidden");
     const sql = await getSql();
     const rows = await sql<{ n: number; max_id: number }>`
