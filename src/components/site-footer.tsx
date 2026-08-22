@@ -37,12 +37,6 @@ export function SiteFooter() {
           >
             Checkout
           </Link>
-          <Link
-            to="/admin/menu"
-            className="mt-3 block text-xs text-subtle hover:text-muted"
-          >
-            Owner: add items & prices
-          </Link>
         </div>
       </div>
     </footer>
