@@ -1,5 +1,6 @@
 import { createHmac } from "node:crypto";
 import { getCookie, getRequestHeader, setResponseHeader } from "@tanstack/react-start/server";
+import { rateLimit } from "./rate-limit";
 
 const COOKIE = "chuski_admin";
 const MAX_AGE_SEC = 7 * 24 * 60 * 60;
@@ -46,6 +47,11 @@ function readCookie(): string | undefined {
   }
 }
 
+function clientIp(): string {
+  const xff = getRequestHeader("x-forwarded-for") ?? "";
+  return (xff.split(",")[0]?.trim() || getRequestHeader("x-real-ip") || "unknown").slice(0, 64);
+}
+
 export function isAdminConfigured() {
   return Boolean(adminSecret());
 }
@@ -63,6 +69,10 @@ export function assertAdmin() {
 }
 
 export function loginWithPassword(password: string) {
+  const limited = rateLimit(`admin-login:${clientIp()}`, 8, 15 * 60 * 1000);
+  if (!limited.ok) {
+    throw new Error("Bohot tries. Thori dair baad try karo.");
+  }
   const secret = adminSecret();
   if (!secret) throw new Error("ADMIN_PASSWORD Vercel env mein set nahi hai");
   if (password !== secret) throw new Error("Galat password");
