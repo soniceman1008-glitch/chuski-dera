@@ -1,33 +1,6 @@
 /**
  * Self-hosted Better Auth for THIS app (server-only).
- *
- * Pre-wired for live preview + deploy — do not rewrite this file. To enable
- * local email/password, flip the flag in `./email-password` only (see auth skill).
- *
- * The app runs its own Better Auth at `/api/auth/*`, so the session cookie stays
- * on this app's own origin. Sign-in federates to the shared **Grok auth broker**
- * (`GROK_AUTH_ISSUER`) via the `genericOAuth` plugin — the broker brokers the
- * upstream sign-in methods (Google, X, …) and holds their shared secrets; this
- * app only holds its own client id/secret and names the upstream it wants via
- * each provider's `idp` hint.
- *
- * Tri-mode:
- *   - Deployed: the deployer injects a per-app `GROK_AUTH_*` + `BETTER_AUTH_URL`
- *     + `DATABASE_URL`, so real federated auth is persisted in Postgres.
- *   - Sandbox live preview: no injection -> falls back to the shared **preview
- *     client** (`./preview`) and derives the preview's `https://*.grok-sandbox.com`
- *     origin from the request, so real sign-in works (no demo users). Sessions
- *     and identities persist in the embedded PGLite DB (same DB as app data);
- *     the process restart wipes both. Live-preview iframe clients use a bearer
- *     token (partitioned cookies) — see `client.ts`.
- *   - Off (`VITE_AUTH_ENABLED=false`, the shipped default): no providers;
- *     `requireUserId` resolves a dev user with no database configured, and
- *     throws fail-closed once `DATABASE_URL` is set (see `verify.server.ts`).
- *
- * NEVER import this from client code — it pulls in `pg` + the preview secret +
- * server-only Better Auth internals. The client uses `@/lib/auth/client`;
- * components read the user via `@/lib/auth/use-current-user`; server functions get
- * a verified id via `@/lib/auth/middleware`.
+ * NEVER import this from client code.
  */
 import { betterAuth } from "better-auth";
 import { bearer, genericOAuth } from "better-auth/plugins";
@@ -46,7 +19,6 @@ import {
   PREVIEW_CLIENT_SECRET,
 } from "./preview";
 
-// Preview only. On Vercel this must never open PGLite (no writable data file).
 if (!isServerlessRuntime()) {
   void ensureDbReady();
 }
@@ -64,7 +36,8 @@ const env = (key: string): string | undefined => {
   return value ? value : undefined;
 };
 
-const authDisabled = env("VITE_AUTH_ENABLED") === "false";
+/** Match client: only ON when explicitly "true". */
+const authDisabled = env("VITE_AUTH_ENABLED") !== "true";
 
 const grokIssuer = env("GROK_AUTH_ISSUER") ?? GROK_ISSUER_DEFAULT;
 const grokClientId = env("GROK_AUTH_CLIENT_ID") ?? PREVIEW_CLIENT_ID;
@@ -101,9 +74,18 @@ const grokAuthorizationUrl = `${issuerBase}/api/auth/oauth2/authorize`;
 const grokTokenUrl = `${issuerBase}/api/auth/oauth2/token`;
 const grokUserInfoUrl = `${issuerBase}/api/auth/oauth2/userinfo`;
 
-const database = databaseUrl
-  ? new Pool({ connectionString: databaseUrl })
-  : { dialect: pgliteDialect(() => getPglite()), type: "postgres" as const };
+/**
+ * Auth OFF on Vercel: do not open PGLite (no writable FS) and do not require
+ * Neon auth tables. Only attach Postgres when auth is explicitly enabled.
+ */
+const database =
+  !authDisabled && databaseUrl
+    ? new Pool({ connectionString: databaseUrl, max: 1 })
+    : !isServerlessRuntime()
+      ? { dialect: pgliteDialect(() => getPglite()), type: "postgres" as const }
+      : databaseUrl
+        ? new Pool({ connectionString: databaseUrl, max: 1 })
+        : { dialect: pgliteDialect(() => getPglite()), type: "postgres" as const };
 
 export const SESSION_TOKEN_COOKIE = "__Host-grok-auth.session_token";
 
