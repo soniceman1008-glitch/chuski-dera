@@ -54,7 +54,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     const unsub = subscribeCatalogSync((msg) => {
       if (msg === "catalog") bump();
     });
-    const id = window.setInterval(bump, 12000);
+    const id = window.setInterval(bump, 3000);
     return () => {
       document.removeEventListener("visibilitychange", onVis);
       unsub();
@@ -75,9 +75,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
       })
       .catch((err: unknown) => {
         if (cancelled) return;
-        setCategories([]);
-        setItems([]);
-        setError(err instanceof Error ? err.message : "Could not load the kitchen menu from the database.");
+        setError(err instanceof Error ? err.message : "Menu load fail");
         setReady(true);
       });
     return () => {
