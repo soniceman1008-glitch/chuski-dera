@@ -81,24 +81,22 @@ function priceList(items: MenuItem[], lang: AgentLang) {
   return `${head}\n${rows.join("\n")}\n${tail}`;
 }
 
-export function detectLang(text: string, fallback?: AgentLang): AgentLang {
-  const detected = detectVoiceLang(text, fallback ?? "ur");
-  return detected === "en" ? "en" : "ur";
+export function detectLang(_text?: string, _fallback?: AgentLang): AgentLang {
+  return "ur";
 }
 
 export { isVoiceUnclear, clarifyLanguage } from "./voice-lang";
 
 type Pack = { en: string; ur: string; ru: string; pa: string; hi: string };
 
-function t(lang: AgentLang, pack: Pack) {
-  if (lang === "en") return pack.en;
+function t(_lang: AgentLang, pack: Pack) {
   return pack.ur;
 }
 
 export function greet(lang: AgentLang = "ur") {
   return t(lang, {
     en: `Hi, welcome to ${RESTAURANT.name}. I can help with the menu, prices, or a delivery order. What would you like?`,
-    ur: `السلام علیکم، ${RESTAURANT.name} میں خوش آمدید۔ مینو؁ قیمت یا آرڈر میں مدد کر سکتی ہوں۔ آپ کیا لینا چاہیں گے؟`,
+    ur: `السلام علیکم، ${RESTAURANT.name} میں خوش آمدید۔ مینو، قیمت یا آرڈر میں مدد کر سکتی ہوں۔ آپ کیا لینا چاہیں گے؟`,
     ru: `السلام علیکم، ${RESTAURANT.name} میں خوش آمدید۔`,
     pa: `السلام علیکم، ${RESTAURANT.name} میں خوش آمدید۔`,
     hi: `السلام علیکم، ${RESTAURANT.name} میں خوش آمدید۔`,
