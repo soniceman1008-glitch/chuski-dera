@@ -2,20 +2,20 @@ function runtimeEnv(name: string): string | undefined {
   const proc = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process;
   const value = proc?.env?.[name];
   if (value == null) return undefined;
-  const trimmed = String(value)
-    .trim()
-    .replace(/^Bearer\s+/i, "")
-    .replace(/^["']|["']$/g, "")
-    .trim();
+  const trimmed = String(value).trim();
   return trimmed ? trimmed : undefined;
 }
 
-export function groqKeyPresent() {
-  return Boolean(runtimeEnv("GROQ_API_KEY"));
+/** Groq keys are gsk_... — ignore pasted curl/newlines. Never return the raw env blob. */
+function groqKey(): string | undefined {
+  const raw = runtimeEnv("GROQ_API_KEY");
+  if (!raw) return undefined;
+  const match = raw.match(/gsk_[A-Za-z0-9]+/);
+  return match?.[0];
 }
 
-function groqKey(): string | undefined {
-  return runtimeEnv("GROQ_API_KEY");
+export function groqKeyPresent() {
+  return Boolean(groqKey());
 }
 
 function fileName(file: File) {
@@ -37,17 +37,6 @@ const MSG_FAIL = "Awaaz samajh nahi aayi. Mic ke qareeb 2-3 second dheere bolo."
 
 function logStt(event: string, extra?: Record<string, string | number | boolean>) {
   console.error("[stt]", event, extra ?? {});
-}
-
-function safeErr(err: unknown) {
-  const name = err instanceof Error ? err.name : "Error";
-  const raw = err instanceof Error ? err.message : "";
-  const msg = raw.replace(/gsk_[a-zA-Z0-9]+/gi, "[redacted]").replace(/Bearer\s+\S+/gi, "[redacted]").slice(0, 80);
-  const cause =
-    err instanceof Error && err.cause instanceof Error
-      ? err.cause.name
-      : "";
-  return { name, msg, cause };
 }
 
 export async function transcribeAudio(
@@ -73,7 +62,8 @@ export async function transcribeAudio(
       body,
     });
   } catch (err) {
-    logStt("fetch_failed", safeErr(err));
+    const name = err instanceof Error ? err.name : "Error";
+    logStt("fetch_failed", { name });
     return { ok: false, status: 503, error: MSG_DOWN };
   }
 
