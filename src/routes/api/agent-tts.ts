@@ -9,7 +9,7 @@ async function handle(request: Request) {
     body = {};
   }
   try {
-    const buf = await synthesizeAgentSpeech(body.text ?? "", body.lang ?? "ru");
+    const buf = await synthesizeAgentSpeech(body.text ?? "", body.lang ?? "ur");
     return new Response(new Uint8Array(buf), {
       status: 200,
       headers: {
