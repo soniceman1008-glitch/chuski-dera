@@ -14,13 +14,71 @@ export type AgentState = {
   step: AgentStep;
 };
 
-function norm(s: string) {
+function foldUrdu(s: string) {
   return s
+    .replace(/[\u064b-\u065f\u0670]/g, "")
+    .replace(/اسلام علیکم|السلام علیکم|السلام|سلام/g, " salam ")
+    .replace(/زینگر|زنگر/g, " zinger ")
+    .replace(/برجر|برگر/g, " burger ")
+    .replace(/شاورما|شاورمہ/g, " shawarma ")
+    .replace(/نگٹس|نگٹس/g, " nuggets ")
+    .replace(/ونگز|ونگس/g, " wings ")
+    .replace(/فرائز|فرايز/g, " fries ")
+    .replace(/چیز/g, " cheese ")
+    .replace(/چاہیے|چاهیے/g, " chahiye ")
+    .replace(/پرائز|پرائس|قیمت|کیمت/g, " price ")
+    .replace(/پڑھائی|پڑھاہی|پڑھہی|پڑھ/g, " price ")
+    .replace(/مینو|مینیو/g, " menu ")
+    .replace(/بتاؤ|بتاو|بتائیے|بتايے/g, " batao ")
+    .replace(/ڈیل/g, " deal ")
+    .replace(/آرڈر/g, " order ")
+    .replace(/مجھے|مجهے/g, " ")
+    .replace(/اپنے|اپني/g, " ");
+}
+
+function norm(s: string) {
+  return foldUrdu(s)
     .toLowerCase()
     .replace(/['’]/g, "")
     .replace(/[^a-z0-9\u0600-\u06ff\u0900-\u097f\u0a00-\u0a7f\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function wantsPrice(n: string) {
+  return /\b(price|keemat|kitne|kitna|rate|batao|prices)\b/.test(n);
+}
+
+function wantsAdd(n: string) {
+  return /\b(order|chahiye|add|lena|chahida|lo|do)\b/.test(n);
+}
+
+function categoryFromText(n: string): (typeof CATEGORIES)[number]["id"] | null {
+  if (/\bdeal/.test(n)) return "deals";
+  if (/\bshawarma\b/.test(n)) return "shawarma";
+  if (/\b(wrap|roll|paratha)\b/.test(n)) return "wraps";
+  if (/\b(fries|nuggets|wings|sides)\b/.test(n)) return "sides";
+  if (/\bburger\b/.test(n)) return "burgers";
+  return null;
+}
+
+function priceList(items: MenuItem[], lang: AgentLang) {
+  const rows = items.slice(0, 8).map((item) => `${item.name} — ${formatRs(item.price)}`);
+  const head = t(lang, {
+    en: "Menu prices:",
+    ur: "مینو پرائز:",
+    ru: "مینو پرائز:",
+    pa: "مینو پرائز:",
+    hi: "مینو پرائز:",
+  });
+  const tail = t(lang, {
+    en: "Which one should I add?",
+    ur: "کون سا شامل کروں؟",
+    ru: "کون سا شامل کروں؟",
+    pa: "کون سا شامل کروں؟",
+    hi: "کون سا شامل کروں؟",
+  });
+  return `${head}\n${rows.join("\n")}\n${tail}`;
 }
 
 export function detectLang(text: string, fallback?: AgentLang): AgentLang {
@@ -68,7 +126,15 @@ export function findMenuItems(text: string): MenuItem[] {
       if (first.length > 3 && n.includes(first)) fuzzy.push(item);
     }
   }
-  return exact.length ? exact : fuzzy;
+  if (exact.length) {
+    const scored = [...exact].sort((a, b) => norm(b.name).length - norm(a.name).length);
+    return scored;
+  }
+  if (/\bzinger\b/.test(n) && /\bburger\b/.test(n) && !/\b(cheese|shawarma)\b/.test(n)) {
+    const z = MENU.find((m) => m.id === "zinger");
+    if (z) return [z];
+  }
+  return fuzzy;
 }
 
 function summary(lines: CartLine[], lang: AgentLang) {
@@ -270,8 +336,18 @@ export function agentReply(
     };
   }
 
-  if (/\b(hi|hello|salam|assalam|hey|namaste|sat sri)\b/i.test(text) && !items[0]) {
+  if (/\b(hi|hello|salam|assalam|hey|namaste|sat sri)\b/.test(n) && !items[0] && !wantsPrice(n)) {
     return { state: s, messages: [greet(lang)] };
+  }
+
+  if (wantsPrice(n) && !items[0]) {
+    const cat = categoryFromText(n);
+    if (cat) return { state: s, messages: [priceList(MENU.filter((m) => m.category === cat), lang)] };
+  }
+
+  const catOnly = categoryFromText(n);
+  if (!items[0] && catOnly && /\bmenu\b/.test(n)) {
+    return { state: s, messages: [priceList(MENU.filter((m) => m.category === catOnly), lang)] };
   }
 
   if (s.lines.length && wantsCheckout(n)) {
@@ -280,7 +356,7 @@ export function agentReply(
 
   if (items[0]) {
     const item = items[0];
-    if (/\b(order|chahiye|add|lena|chahida|lo)\b/i.test(text) || (qty && qty >= 1 && qty <= 20)) {
+    if (wantsAdd(n) || (qty && qty >= 1 && qty <= 20)) {
       const q = qty && qty >= 1 && qty <= 20 ? qty : 1;
       const found = s.lines.find((l) => l.id === item.id);
       const lines = found
@@ -315,7 +391,7 @@ export function agentReply(
     };
   }
 
-  if (/\b(menu|items|kya kya|ki ki|kya milta)\b/i.test(text)) {
+  if (/\b(menu|items|kya kya|ki ki|kya milta)\b/.test(n)) {
     const cats = CATEGORIES.filter((c) => c.id !== "all")
       .map((c) => c.label)
       .join(", ");
