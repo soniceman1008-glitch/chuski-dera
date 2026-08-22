@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { transcribeAudio } from "@/lib/server/stt";
 import { clientIpFromHeaders, rateLimit } from "@/lib/server/rate-limit";
 
-const MAX_BYTES = 8 * 1024 * 1024;
+const MAX_BYTES = 4 * 1024 * 1024;
+const ALLOWED_TYPE = /^(audio\/|video\/webm|application\/octet-stream|$)/i;
 
 async function handle(request: Request) {
   const ip = clientIpFromHeaders(request.headers);
@@ -12,6 +13,11 @@ async function handle(request: Request) {
       { error: "Bohot requests. Thori dair baad try karo." },
       { status: 429, headers: { "Retry-After": String(limited.retryAfter) } },
     );
+  }
+
+  const declared = Number(request.headers.get("content-length") || 0);
+  if (declared > MAX_BYTES + 8192) {
+    return Response.json({ error: "Audio file too large." }, { status: 413 });
   }
 
   let form: FormData;
@@ -25,7 +31,10 @@ async function handle(request: Request) {
     return Response.json({ error: "Awaaz record nahi hui." }, { status: 400 });
   }
   if (file.size > MAX_BYTES) {
-    return Response.json({ error: "Audio file bohot bari hai." }, { status: 413 });
+    return Response.json({ error: "Audio file too large." }, { status: 413 });
+  }
+  if (file.type && !ALLOWED_TYPE.test(file.type)) {
+    return Response.json({ error: "Audio file invalid hai." }, { status: 400 });
   }
   try {
     const result = await transcribeAudio(file);
