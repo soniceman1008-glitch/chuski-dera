@@ -36,7 +36,8 @@ const MSG_DOWN = "Voice service temporarily down. Thori dair baad try karo.";
 const MSG_FAIL = "Awaaz samajh nahi aayi. Mic ke qareeb 2-3 second dheere bolo.";
 
 function logStt(event: string, extra?: Record<string, string | number | boolean>) {
-  console.error("[stt]", event, extra ?? {});
+  if (event === "ok") console.log("[stt]", event, extra ?? {});
+  else console.error("[stt]", event, extra ?? {});
 }
 
 export async function transcribeAudio(
@@ -87,7 +88,8 @@ export async function transcribeAudio(
   try {
     const data = (await res.json()) as { text?: string };
     const text = String(data.text ?? "").trim();
-    if (!text) {
+    const usable = text.replace(/[.\s,!?\u061f\u06d4]+/g, "").trim();
+    if (!usable) {
       logStt("empty_transcript");
       return { ok: false, status: 422, error: MSG_FAIL };
     }
