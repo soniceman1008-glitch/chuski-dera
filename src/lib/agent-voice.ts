@@ -32,13 +32,27 @@ function isMaleVoice(v: SpeechSynthesisVoice) {
   );
 }
 
-function scoreVoice(v: SpeechSynthesisVoice, _lang: VoiceLang) {
+function scoreVoice(v: SpeechSynthesisVoice, lang: VoiceLang) {
   const hay = `${v.name} ${v.lang}`.toLowerCase();
   let n = 0;
   if (isFemaleVoice(v)) n += 8;
   if (isMaleVoice(v)) n -= 12;
+  if (lang === "en") {
+    if (/^en/.test(v.lang.toLowerCase())) n += 15;
+    if (/en-in|india|neerja/.test(hay)) n += 5;
+    return n;
+  }
+  if (lang === "hi") {
+    if (/hi-in|hindi|swara|heera|ananya|aditi/.test(hay)) n += 20;
+    return n;
+  }
+  if (lang === "pa") {
+    if (/pa-|punjabi|gurmukhi/.test(hay)) n += 20;
+    else if (/hi-in|hindi/.test(hay)) n += 8;
+    return n;
+  }
   if (/ur-pk|urdu|uzma|pakistan/.test(hay)) n += 20;
-  else if (/hi-in|hindi|swara|heera|ananya|aditi/.test(hay)) n += 10;
+  else if (/hi-in|hindi|swara/.test(hay)) n += 8;
   else if (/^en/.test(v.lang.toLowerCase())) n -= 6;
   return n;
 }
@@ -51,8 +65,18 @@ function pickVoice(lang: VoiceLang): SpeechSynthesisVoice | null {
   return [...voices].sort((a, b) => scoreVoice(b, lang) - scoreVoice(a, lang))[0] ?? null;
 }
 
-function ttsLang(_lang?: VoiceLang) {
+function ttsLang(lang?: VoiceLang) {
+  if (lang === "en") return "en-IN";
+  if (lang === "hi") return "hi-IN";
+  if (lang === "pa") return "pa-IN";
   return "ur-PK";
+}
+
+function googleTtsCode(lang: VoiceLang) {
+  if (lang === "en") return "en";
+  if (lang === "hi") return "hi";
+  if (lang === "pa") return "pa";
+  return "ur";
 }
 
 async function speakBrowser(script: string, lang: VoiceLang) {
@@ -105,14 +129,13 @@ async function playBlob(blob: Blob) {
   return url;
 }
 
-/** Real Urdu speech via Google Translate TTS (works in browser, no Vercel python). */
-function urduTtsUrl(text: string) {
+function cloudTtsUrl(text: string, lang: VoiceLang) {
   const q = encodeURIComponent(text.slice(0, 180));
-  return `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=ur&q=${q}`;
+  const tl = googleTtsCode(lang);
+  return `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${tl}&q=${q}`;
 }
 
-async function speakUrduCloud(script: string): Promise<boolean> {
-  // Chunk long Urdu replies for Google TTS length limits
+async function speakCloud(script: string, lang: VoiceLang): Promise<boolean> {
   const chunks: string[] = [];
   let rest = script.trim();
   while (rest.length > 160) {
@@ -123,7 +146,7 @@ async function speakUrduCloud(script: string): Promise<boolean> {
   }
   if (rest) chunks.push(rest);
   for (const chunk of chunks.slice(0, 5)) {
-    const url = urduTtsUrl(chunk);
+    const url = cloudTtsUrl(chunk, lang);
     const ok = await new Promise<boolean>((resolve) => {
       const audio = new Audio(url);
       current = audio;
@@ -136,9 +159,7 @@ async function speakUrduCloud(script: string): Promise<boolean> {
       };
       audio.onended = () => done(true);
       audio.onerror = () => done(false);
-      void audio.play().then(() => {
-        /* playing */
-      }).catch(() => done(false));
+      void audio.play().then(() => {}).catch(() => done(false));
       window.setTimeout(() => done(true), 12_000);
     });
     if (!ok) return false;
@@ -146,18 +167,18 @@ async function speakUrduCloud(script: string): Promise<boolean> {
   return true;
 }
 
-export async function speakAgentReply(text: string, _lang: VoiceLang): Promise<string | null> {
+export async function speakAgentReply(text: string, lang: VoiceLang): Promise<string | null> {
   if (typeof window === "undefined") return null;
   stopAgentVoice();
   const script = voiceScript(text);
-  // Prefer real Urdu cloud TTS — never wait on broken /api/agent-tts
+  const replyLang = lang || "en";
   try {
-    const ok = await speakUrduCloud(script);
+    const ok = await speakCloud(script, replyLang);
     if (ok) return null;
   } catch {
-    /* fall through */
+    /* browser fallback */
   }
-  await speakBrowser(script, "ur");
+  await speakBrowser(script, replyLang);
   return null;
 }
 
