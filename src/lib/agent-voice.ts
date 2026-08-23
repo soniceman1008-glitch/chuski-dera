@@ -109,18 +109,23 @@ export async function speakAgentReply(text: string, _lang: VoiceLang): Promise<s
   if (typeof window === "undefined") return null;
   stopAgentVoice();
   const script = voiceScript(text);
+  // Server TTS often hangs on Vercel (no edge-tts). Abort fast; browser speaks Urdu/Hindi.
   try {
     const res = await fetch("/api/agent-tts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text: script, lang: "ur" }),
+      signal: AbortSignal.timeout(1500),
     });
     if (res.ok) {
       const blob = await res.blob();
-      if (blob.size > 200) return playBlob(blob);
+      const type = (blob.type || "").toLowerCase();
+      if (blob.size > 200 && (type.includes("audio") || type.includes("mpeg") || type === "")) {
+        return playBlob(blob);
+      }
     }
   } catch {
-    /* browser Urdu/Hindi fallback */
+    /* browser fallback */
   }
   await speakBrowser(script, "ur");
   return null;
@@ -189,9 +194,9 @@ async function transcribeBlob(blob: Blob): Promise<string> {
   } catch {
     data = {};
   }
-  if (!res.ok) throw new Error(data.error || "Awaaz samajh nahi aayi.");
+  if (!res.ok) throw new Error(data.error || "آواز سمجھ نہیں آئی۔");
   const text = String(data.text ?? "").trim();
-  if (!text) throw new Error("Awaaz samajh nahi aayi. Mic ke qareeb 2-3 second dheere bolo.");
+  if (!text) throw new Error("آواز سمجھ نہیں آئی۔ مائیک کے قریب دو تین سیکنڈ آہستہ بولیں۔");
   return text;
 }
 
@@ -259,7 +264,7 @@ export function createVoiceSession(_lang: VoiceLang): VoiceSession {
               try {
                 transcript = nlpClean(await transcribeBlob(audioBlob));
               } catch (e) {
-                error = e instanceof Error ? e.message : "Awaaz samajh nahi aayi.";
+                error = e instanceof Error ? e.message : "آواز سمجھ نہیں آئی۔";
               }
             }
           }
