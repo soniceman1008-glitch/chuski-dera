@@ -9,7 +9,10 @@ async function handle(request: Request) {
     body = {};
   }
   try {
-    const buf = await synthesizeAgentSpeech(body.text ?? "", body.lang ?? "ur");
+    const buf = await Promise.race([
+      synthesizeAgentSpeech(body.text ?? "", body.lang ?? "ur"),
+      new Promise<never>((_, rej) => setTimeout(() => rej(new Error("tts slow")), 4500)),
+    ]);
     return new Response(new Uint8Array(buf), {
       status: 200,
       headers: {
@@ -18,7 +21,10 @@ async function handle(request: Request) {
       },
     });
   } catch {
-    return new Response("TTS failed", { status: 500 });
+    return new Response(JSON.stringify({ error: "tts_unavailable" }), {
+      status: 503,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 }
 

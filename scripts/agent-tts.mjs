@@ -82,7 +82,7 @@ asyncio.run(main())
     const t = setTimeout(() => {
       child.kill("SIGKILL");
       reject(new Error("tts timeout"));
-    }, 20000);
+    }, 4000);
     child.on("close", (code) => {
       clearTimeout(t);
       if (code === 0) resolve(undefined);
