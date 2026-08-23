@@ -105,27 +105,57 @@ async function playBlob(blob: Blob) {
   return url;
 }
 
+/** Real Urdu speech via Google Translate TTS (works in browser, no Vercel python). */
+function urduTtsUrl(text: string) {
+  const q = encodeURIComponent(text.slice(0, 180));
+  return `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=ur&q=${q}`;
+}
+
+async function speakUrduCloud(script: string): Promise<boolean> {
+  // Chunk long Urdu replies for Google TTS length limits
+  const chunks: string[] = [];
+  let rest = script.trim();
+  while (rest.length > 160) {
+    let cut = rest.lastIndexOf(" ", 160);
+    if (cut < 40) cut = 160;
+    chunks.push(rest.slice(0, cut).trim());
+    rest = rest.slice(cut).trim();
+  }
+  if (rest) chunks.push(rest);
+  for (const chunk of chunks.slice(0, 5)) {
+    const url = urduTtsUrl(chunk);
+    const ok = await new Promise<boolean>((resolve) => {
+      const audio = new Audio(url);
+      current = audio;
+      let settled = false;
+      const done = (success: boolean) => {
+        if (settled) return;
+        settled = true;
+        if (current === audio) current = null;
+        resolve(success);
+      };
+      audio.onended = () => done(true);
+      audio.onerror = () => done(false);
+      void audio.play().then(() => {
+        /* playing */
+      }).catch(() => done(false));
+      window.setTimeout(() => done(true), 12_000);
+    });
+    if (!ok) return false;
+  }
+  return true;
+}
+
 export async function speakAgentReply(text: string, _lang: VoiceLang): Promise<string | null> {
   if (typeof window === "undefined") return null;
   stopAgentVoice();
   const script = voiceScript(text);
-  // Server TTS often hangs on Vercel (no edge-tts). Abort fast; browser speaks Urdu/Hindi.
+  // Prefer real Urdu cloud TTS — never wait on broken /api/agent-tts
   try {
-    const res = await fetch("/api/agent-tts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: script, lang: "ur" }),
-      signal: AbortSignal.timeout(1500),
-    });
-    if (res.ok) {
-      const blob = await res.blob();
-      const type = (blob.type || "").toLowerCase();
-      if (blob.size > 200 && (type.includes("audio") || type.includes("mpeg") || type === "")) {
-        return playBlob(blob);
-      }
-    }
+    const ok = await speakUrduCloud(script);
+    if (ok) return null;
   } catch {
-    /* browser fallback */
+    /* fall through */
   }
   await speakBrowser(script, "ur");
   return null;
