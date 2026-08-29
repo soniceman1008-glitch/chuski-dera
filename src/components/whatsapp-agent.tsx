@@ -12,13 +12,11 @@ import {
   type VoiceCaptureResult,
   type VoiceSession,
 } from "@/lib/agent-voice";
+import { clarifyLanguage, isVoiceUnclear } from "@/lib/voice-lang";
 import {
   agentReply,
-  clarifyLanguage,
-  detectLang,
   greet,
   initialAgentState,
-  isVoiceUnclear,
   type AgentLang,
   type AgentState,
 } from "@/lib/wa-agent";
