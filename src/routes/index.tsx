@@ -35,6 +35,7 @@ function Home() {
   }
 
   const mapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(RESTAURANT.mapsQuery)}`;
+  const mapsEmbed = `https://www.google.com/maps?q=${encodeURIComponent(RESTAURANT.mapsQuery)}&z=16&output=embed`;
 
   return (
     <main>
@@ -96,14 +97,16 @@ function Home() {
 
       <section id="visit" className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
         <div className="grid overflow-hidden rounded-xl bg-surface shadow-[var(--shadow-card)] md:grid-cols-2">
-          <a href={mapsLink} target="_blank" rel="noopener noreferrer" className="relative block h-64 bg-elevated md:h-[28rem]">
-            <img src="/images/hero.jpg" alt="Open Chuski Dera in Google Maps" className="h-full w-full object-cover" />
-            <span className="absolute inset-0 grid place-items-center bg-bg/55">
-              <span className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-primary-fg">
-                <MapPin className="size-4" /> Open Google Maps
-              </span>
-            </span>
-          </a>
+          <div className="bg-elevated">
+            <iframe
+              title="Chuski Dera on Google Maps"
+              src={mapsEmbed}
+              className="h-64 w-full border-0 md:h-[28rem]"
+              loading="lazy"
+              referrerPolicy="strict-origin-when-cross-origin"
+              allowFullScreen
+            />
+          </div>
           <div className="flex flex-col justify-center px-6 py-10 sm:px-10">
             <p className="text-xs font-semibold tracking-[0.16em] text-subtle uppercase">Find us</p>
             <h2 className="mt-2 font-display text-4xl tracking-wide">Green Belt, Jhang</h2>
