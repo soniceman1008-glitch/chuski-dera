@@ -1,2 +1,10 @@
-export { detectLang, findMenuItems, greet, initialAgentState, agentReply, isOrderConfirmed } from "./wa-agent-core";
-export type { AgentLang, AgentStep, AgentState } from "./wa-agent-core";
+export {
+  detectLang,
+  greet,
+  initialAgentState,
+  agentReply,
+  isOrderConfirmed,
+  isVoiceUnclear,
+  clarifyLanguage,
+} from "./wa-agent";
+export type { AgentLang, AgentStep, AgentState } from "./wa-agent";
