@@ -35,6 +35,8 @@ function Home() {
   }
 
   const mapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(RESTAURANT.mapsQuery)}`;
+  const mapsEmbed =
+    "https://www.google.com/maps/embed?pb=!1m14!1m8!1m3!1d13604!2d72.3317!3d31.2781!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3922683c3c3c3c3c%3A0x0!2sSatellite%20Town%20B%20Block%2C%20Green%20Belt%2C%20Jhang!5e0!3m2!1sen!2spk";
 
   return (
     <main>
@@ -153,12 +155,13 @@ function Home() {
       <section id="visit" className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
         <div className="grid overflow-hidden rounded-xl bg-surface shadow-[var(--shadow-card)] md:grid-cols-2">
           <div className="bg-elevated">
-            <img
-              src="/images/zinger-burger.jpg?v=3"
-              alt="Chuski Dera Zinger Burger"
-              width={800}
-              height={448}
-              className="h-64 w-full object-cover md:h-[28rem]"
+            <iframe
+              title="Chuski Dera on Google Maps"
+              src={mapsEmbed}
+              className="h-64 w-full border-0 md:h-[28rem]"
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              allowFullScreen
             />
           </div>
           <div className="flex flex-col justify-center px-6 py-10 sm:px-10">
