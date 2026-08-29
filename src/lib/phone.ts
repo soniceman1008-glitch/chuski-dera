@@ -16,6 +16,14 @@ export function isCanonicalPhone(value: string) {
   return ALLOWED.has(digitsOnly(value));
 }
 
+export function normalizePkPhone(text: string): string | null {
+  const d = digitsOnly(text);
+  if (d.length === 11 && d.startsWith("03")) return d;
+  if (d.length === 12 && d.startsWith("92")) return `0${d.slice(2)}`;
+  if (d.length === 10 && d.startsWith("3")) return `0${d}`;
+  return null;
+}
+
 export function sanitizeCallDisplay(_value?: string) {
   return CALL_DISPLAY;
 }
