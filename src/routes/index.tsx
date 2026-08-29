@@ -35,7 +35,9 @@ function Home() {
     document.getElementById("menu")?.scrollIntoView({ behavior: "smooth" });
   }
 
-  const mapsSrc = `https://maps.google.com/maps?q=${encodeURIComponent(RESTAURANT.mapsQuery)}&z=16&output=embed`;
+  const mapsSrc =
+    "https://www.openstreetmap.org/export/embed.html?bbox=72.3000%2C31.2500%2C72.3500%2C31.3000&layer=mapnik&marker=31.275%2C72.325";
+  const mapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(RESTAURANT.mapsQuery)}`;
 
   return (
     <main>
@@ -189,7 +191,7 @@ function Home() {
 
       <section id="visit" className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
         <div className="grid overflow-hidden rounded-xl bg-surface shadow-[var(--shadow-card)] md:grid-cols-2">
-          <div className="min-h-64 md:min-h-[28rem]">
+          <div className="min-h-64 bg-elevated md:min-h-[28rem]">
             <iframe
               title="Chuski Dera on the map"
               src={mapsSrc}
@@ -208,6 +210,14 @@ function Home() {
               <Phone className="size-4" />
               {CALL_DISPLAY}
             </CallLink>
+            <a
+              href={mapsLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 inline-flex h-12 w-fit items-center rounded-lg px-5 text-sm font-medium text-fg ring-1 ring-border transition-colors hover:bg-elevated"
+            >
+              Open in Google Maps
+            </a>
             <Link
               to="/order"
               className="mt-3 inline-flex h-12 w-fit items-center rounded-lg px-5 text-sm font-medium text-fg ring-1 ring-border transition-colors hover:bg-elevated"
