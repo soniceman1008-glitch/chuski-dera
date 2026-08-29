@@ -35,8 +35,6 @@ function Home() {
     document.getElementById("menu")?.scrollIntoView({ behavior: "smooth" });
   }
 
-  const mapsSrc =
-    "https://www.openstreetmap.org/export/embed.html?bbox=72.3000%2C31.2500%2C72.3500%2C31.3000&layer=mapnik&marker=31.275%2C72.325";
   const mapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(RESTAURANT.mapsQuery)}`;
 
   return (
@@ -192,12 +190,10 @@ function Home() {
       <section id="visit" className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
         <div className="grid overflow-hidden rounded-xl bg-surface shadow-[var(--shadow-card)] md:grid-cols-2">
           <div className="min-h-64 bg-elevated md:min-h-[28rem]">
-            <iframe
-              title="Chuski Dera on the map"
-              src={mapsSrc}
-              className="size-full min-h-64 border-0 md:min-h-[28rem]"
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
+            <img
+              src="/images/hero.jpg"
+              alt="Chuski Dera food"
+              className="size-full min-h-64 object-cover md:min-h-[28rem]"
             />
           </div>
           <div className="flex flex-col justify-center px-6 py-10 sm:px-10">
