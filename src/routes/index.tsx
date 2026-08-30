@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight, MapPin, Phone, Bike } from "lucide-react";
 import { MenuGrid } from "@/components/menu-grid";
@@ -34,8 +35,9 @@ function Home() {
     document.getElementById("menu")?.scrollIntoView({ behavior: "smooth" });
   }
 
-  const mapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(RESTAURANT.mapsQuery)}`;
-  const mapsEmbed = `https://www.google.com/maps?q=${encodeURIComponent(RESTAURANT.mapsQuery)}&z=16&output=embed`;
+  const mapsQuery = "Satellite Town B Block, Green Belt, Jhang, Pakistan";
+  const mapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsQuery)}`;
+  const mapsEmbed = `https://www.google.com/maps?q=${encodeURIComponent(mapsQuery)}&output=embed`;
 
   return (
     <main>
@@ -97,16 +99,7 @@ function Home() {
 
       <section id="visit" className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
         <div className="grid overflow-hidden rounded-xl bg-surface shadow-[var(--shadow-card)] md:grid-cols-2">
-          <div className="bg-elevated">
-            <iframe
-              title="Chuski Dera on Google Maps"
-              src={mapsEmbed}
-              className="h-64 w-full border-0 md:h-[28rem]"
-              loading="lazy"
-              referrerPolicy="strict-origin-when-cross-origin"
-              allowFullScreen
-            />
-          </div>
+          <VisitMap embedUrl={mapsEmbed} openUrl={mapsLink} />
           <div className="flex flex-col justify-center px-6 py-10 sm:px-10">
             <p className="text-xs font-semibold tracking-[0.16em] text-subtle uppercase">Find us</p>
             <h2 className="mt-2 font-display text-4xl tracking-wide">Green Belt, Jhang</h2>
@@ -122,3 +115,39 @@ function Home() {
     </main>
   );
 }
+
+function VisitMap({ embedUrl, openUrl }: { embedUrl: string; openUrl: string }) {
+  const [failed, setFailed] = useState(false);
+
+  if (failed) {
+    return (
+      <div className="flex h-64 flex-col items-center justify-center gap-3 bg-elevated px-6 text-center md:h-[28rem]">
+        <MapPin className="size-8 text-primary" />
+        <p className="text-sm font-medium">Satellite Town B Block, Green Belt, Jhang</p>
+        <a
+          href={openUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex h-12 items-center rounded-lg bg-primary px-5 text-sm font-semibold text-primary-fg"
+        >
+          Open in Google Maps
+        </a>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-elevated">
+      <iframe
+        title="Chuski Dera on Google Maps — Satellite Town B Block, Green Belt, Jhang"
+        src={embedUrl}
+        className="h-64 w-full border-0 md:h-[28rem]"
+        loading="lazy"
+        referrerPolicy="no-referrer-when-downgrade"
+        allowFullScreen
+        onError={() => setFailed(true)}
+      />
+    </div>
+  );
+}
+
