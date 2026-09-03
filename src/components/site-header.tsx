@@ -1,9 +1,17 @@
+import { useEffect, useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { ShoppingBag } from "lucide-react";
+import { Menu, ShoppingBag, X } from "lucide-react";
 import { LogoMark } from "@/components/logo-mark";
 import { RESTAURANT } from "@/lib/menu";
 import { itemCount, useCart } from "@/lib/cart-store";
 import { useHasMounted } from "@/lib/use-has-mounted";
+
+const NAV = [
+  { href: "/#menu", label: "Menu" },
+  { href: "/#deals", label: "Deals" },
+  { href: "/#visit", label: "Location" },
+  { href: "/order", label: "Checkout" },
+] as const;
 
 export function SiteHeader() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -11,11 +19,21 @@ export function SiteHeader() {
   const setDrawerOpen = useCart((s) => s.setDrawerOpen);
   const mounted = useHasMounted();
   const count = mounted ? itemCount(lines) : 0;
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [menuOpen]);
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-bg/90 backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:h-[4.5rem] sm:px-6">
-        <Link to="/" className="flex items-center gap-2.5">
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4 sm:h-[4.5rem] sm:px-6">
+        <Link to="/" className="flex min-h-11 items-center gap-2.5">
           <span className="grid size-9 place-items-center rounded-md bg-primary text-primary-fg">
             <LogoMark />
           </span>
@@ -29,15 +47,17 @@ export function SiteHeader() {
           </span>
         </Link>
         <nav className="hidden items-center gap-7 text-sm text-muted md:flex">
-          <a href="/#menu" className="transition-colors hover:text-fg">
-            Menu
-          </a>
-          <a href="/#visit" className="transition-colors hover:text-fg">
-            Location
-          </a>
-          <Link to="/order" className="transition-colors hover:text-fg">
-            Checkout
-          </Link>
+          {NAV.map((item) =>
+            item.href === "/order" ? (
+              <Link key={item.href} to="/order" className="transition-colors hover:text-fg">
+                {item.label}
+              </Link>
+            ) : (
+              <a key={item.href} href={item.href} className="transition-colors hover:text-fg">
+                {item.label}
+              </a>
+            ),
+          )}
         </nav>
         <div className="flex items-center gap-2">
           {pathname !== "/order" && (
@@ -62,8 +82,54 @@ export function SiteHeader() {
               </span>
             )}
           </button>
+          <button
+            type="button"
+            className="grid size-11 place-items-center rounded-lg ring-1 ring-border md:hidden"
+            aria-label={menuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={menuOpen}
+            aria-controls="mobile-nav"
+            onClick={() => setMenuOpen((o) => !o)}
+          >
+            {menuOpen ? <X className="size-4" /> : <Menu className="size-4" />}
+          </button>
         </div>
       </div>
+      {menuOpen && (
+        <div className="md:hidden">
+          <button
+            type="button"
+            className="fixed inset-0 z-40 bg-bg/70"
+            aria-label="Close menu overlay"
+            onClick={() => setMenuOpen(false)}
+          />
+          <nav
+            id="mobile-nav"
+            className="relative z-50 border-t border-border bg-bg px-4 py-3"
+          >
+            {NAV.map((item) =>
+              item.href === "/order" ? (
+                <Link
+                  key={item.href}
+                  to="/order"
+                  className="flex h-12 items-center text-sm font-medium"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  {item.label}
+                </Link>
+              ) : (
+                <a
+                  key={item.href}
+                  href={item.href}
+                  className="flex h-12 items-center text-sm font-medium"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  {item.label}
+                </a>
+              ),
+            )}
+          </nav>
+        </div>
+      )}
     </header>
   );
 }

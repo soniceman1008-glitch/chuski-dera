@@ -24,11 +24,18 @@ export function FoodCard({ item }: { item: MenuItem }) {
         className="aspect-[4/3] w-full cursor-pointer overflow-hidden border-0 bg-elevated p-0 text-left"
         aria-label={`Add ${item.name} to cart`}
       >
-        <img
-          src={item.image}
-          alt={item.name}
-          className="size-full object-cover transition-transform duration-500 ease-[var(--ease-smooth-out)] group-hover:scale-[1.04]"
-        />
+        <picture>
+          <source type="image/webp" srcSet={item.image.replace(/\.jpe?g$/i, ".webp")} />
+          <img
+            src={item.image}
+            alt={item.name}
+            width={800}
+            height={600}
+            loading="lazy"
+            decoding="async"
+            className="size-full object-cover transition-transform duration-500 ease-[var(--ease-smooth-out)] group-hover:scale-[1.04]"
+          />
+        </picture>
       </button>
       <div className="flex flex-1 flex-col gap-3 p-4">
         <div className="flex-1">

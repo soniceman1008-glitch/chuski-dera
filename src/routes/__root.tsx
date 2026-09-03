@@ -10,6 +10,26 @@ import { CatalogProvider, CatalogStatusBanner } from "@/lib/catalog-store";
 import appCss from "../styles.css?url";
 
 const APP_NAME = "Chuski Dera";
+const SITE = "https://chuski-dera.vercel.app";
+const DESCRIPTION =
+  "Chuski Dera — burgers, shawarma, juices and shakes in Satellite Town, Jhang. Call +923139235654.";
+
+const LOCAL_BUSINESS = {
+  "@context": "https://schema.org",
+  "@type": "FastFoodRestaurant",
+  name: APP_NAME,
+  image: `${SITE}/og.jpg`,
+  url: SITE,
+  telephone: "+923139235654",
+  address: {
+    "@type": "PostalAddress",
+    streetAddress: "Satellite Town B Block, Green Belt",
+    addressLocality: "Jhang",
+    addressCountry: "PK",
+  },
+  servesCuisine: ["Pakistani", "Fast food"],
+  priceRange: "PKR",
+};
 
 function NotFoundPage() {
   return (
@@ -34,13 +54,22 @@ export const Route = createRootRoute({
       { title: APP_NAME },
       {
         name: "description",
-        content:
-          "Chuski Dera — burgers, shawarma, juices and shakes in Satellite Town, Jhang. Call +923139235654.",
+        content: DESCRIPTION,
       },
       { name: "theme-color", content: "#0b0b0b" },
       { name: "apple-mobile-web-app-title", content: APP_NAME },
+      { property: "og:type", content: "website" },
+      { property: "og:locale", content: "en_PK" },
+      { property: "og:title", content: APP_NAME },
+      { property: "og:description", content: DESCRIPTION },
+      { property: "og:url", content: SITE },
+      { property: "og:image", content: `${SITE}/og.jpg` },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: APP_NAME },
+      { name: "twitter:description", content: DESCRIPTION },
     ],
     links: [
+      { rel: "canonical", href: SITE },
       { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
       { rel: "apple-touch-icon", href: "/favicon.svg" },
       { rel: "preload", href: "/audio/choice.mp3?v=prev", as: "audio" },
@@ -71,6 +100,7 @@ function RootDocument() {
         <VoicePrime />
         <AuthProvider>
           <CatalogProvider>
+            <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(LOCAL_BUSINESS) }} />
             <div className="flex min-h-dvh flex-col">
               {chrome && <SiteHeader />}
               {chrome && <CatalogStatusBanner />}

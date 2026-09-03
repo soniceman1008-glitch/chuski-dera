@@ -39,12 +39,19 @@ export function DealCard({ item }: { item: DealItem }) {
         {broken || !item.image ? (
           <div className="grid size-full place-items-center bg-elevated text-xs text-muted">{item.name}</div>
         ) : (
-          <img
-            src={item.image}
-            alt={item.name}
-            className="size-full object-cover transition-transform duration-500 ease-[var(--ease-smooth-out)] group-hover:scale-[1.04]"
-            onError={() => setBroken(true)}
-          />
+          <picture>
+            <source type="image/webp" srcSet={item.image.replace(/\.jpe?g$/i, ".webp")} />
+            <img
+              src={item.image}
+              alt={item.name}
+              width={800}
+              height={600}
+              loading="lazy"
+              decoding="async"
+              className="size-full object-cover transition-transform duration-500 ease-[var(--ease-smooth-out)] group-hover:scale-[1.04]"
+              onError={() => setBroken(true)}
+            />
+          </picture>
         )}
       </button>
       <div className="flex flex-1 flex-col gap-3 p-4">

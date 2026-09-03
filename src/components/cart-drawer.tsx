@@ -61,6 +61,10 @@ export function CartDrawer() {
                     <img
                       src={item.image}
                       alt=""
+                      width={64}
+                      height={64}
+                      loading="lazy"
+                      decoding="async"
                       className="size-16 shrink-0 rounded-md object-cover"
                     />
                     <div className="min-w-0 flex-1">

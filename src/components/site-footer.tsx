@@ -21,7 +21,7 @@ export function SiteFooter() {
           <p className="text-xs font-semibold tracking-[0.16em] text-subtle uppercase">Visit</p>
           <p className="mt-3 text-sm leading-relaxed text-muted">{shop.address}</p>
           {shop.hours ? <p className="mt-1 text-xs text-subtle">{shop.hours}</p> : null}
-          <CallLink className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary-hot">
+          <CallLink className="mt-3 inline-flex h-11 items-center gap-2 text-sm font-medium text-primary hover:text-primary-hot">
             <Phone className="size-4" />
             {CALL_DISPLAY}
           </CallLink>
@@ -37,6 +37,17 @@ export function SiteFooter() {
           >
             Checkout
           </Link>
+          <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm">
+            <a href="/#deals" className="inline-flex h-11 items-center text-muted hover:text-fg">
+              Deals
+            </a>
+            <a href="/#menu" className="inline-flex h-11 items-center text-muted hover:text-fg">
+              Menu
+            </a>
+            <Link to="/privacy" className="inline-flex h-11 items-center text-muted hover:text-fg">
+              Privacy
+            </Link>
+          </div>
         </div>
       </div>
     </footer>

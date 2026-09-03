@@ -126,6 +126,10 @@ export function CheckoutForm() {
                     <img
                       src={item.image}
                       alt=""
+                      width={56}
+                      height={56}
+                      loading="lazy"
+                      decoding="async"
                       className="size-14 rounded-md object-cover"
                     />
                     <div className="min-w-0 flex-1">

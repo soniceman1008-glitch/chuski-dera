@@ -42,7 +42,18 @@ function Home() {
   return (
     <main>
       <section className="relative isolate min-h-[78dvh] overflow-hidden bg-bg">
-        <img src="/images/hero.jpg" alt="Burgers, shawarma, fries and wings from Chuski Dera" className="absolute inset-0 size-full object-cover" />
+        <picture>
+          <source type="image/webp" srcSet="/images/hero.webp" />
+          <img
+            src="/images/hero.jpg"
+            alt="Burgers, shawarma, fries and wings from Chuski Dera"
+            width={1400}
+            height={787}
+            fetchPriority="high"
+            decoding="async"
+            className="absolute inset-0 size-full object-cover"
+          />
+        </picture>
         <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/70 to-bg/25" />
         <div className="relative mx-auto flex min-h-[78dvh] max-w-6xl flex-col justify-end px-4 pb-16 pt-28 sm:px-6 sm:pb-20">
           <div className="stagger-in max-w-xl">
