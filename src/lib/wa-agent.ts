@@ -54,7 +54,7 @@ function confirmationDecision(text: string): "confirm" | "reject" | "unclear" {
     .trim();
   if (/^(nahi|nahin|no|nope|cancel|mat|galat)(?:\s+\w+){0,3}$/i.test(n)) return "reject";
   if (
-    /^(haan ji|ji haan|haan|han|yes|yeah|yep|confirm|confirmed|i confirm)(?:\s+(please|karo|kardo|kar do|bhej|bhejo|do|it|confirm|haan|han|yes))?$/i.test(
+    /^(haan ji|ji haan|haan|han|yes|confirm|yes confirm)(?:\s+(please|karo|confirm|haan|han|yes))?$/i.test(
       n,
     )
   ) {

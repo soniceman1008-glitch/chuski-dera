@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { groqKeyPresent, transcribeAudio } from "@/lib/server/stt";
+import { transcribeAudio } from "@/lib/server/stt";
 import { clientIpFromHeaders, rateLimit } from "@/lib/server/rate-limit";
 
 const MAX_BYTES = 4 * 1024 * 1024;
@@ -49,7 +49,7 @@ async function handlePost(request: Request) {
 export const Route = createFileRoute("/api/transcribe")({
   server: {
     handlers: {
-      GET: () => Response.json({ groqConfigured: groqKeyPresent() }),
+      GET: () => Response.json({ ok: true }),
       POST: ({ request }) => handlePost(request),
     },
   },
