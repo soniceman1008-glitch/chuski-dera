@@ -72,13 +72,6 @@ function ttsLang(lang?: VoiceLang) {
   return "ur-PK";
 }
 
-function googleTtsCode(lang: VoiceLang) {
-  if (lang === "en") return "en";
-  if (lang === "hi") return "hi";
-  if (lang === "pa") return "pa";
-  return "ur";
-}
-
 async function speakBrowser(script: string, lang: VoiceLang) {
   const synth = window.speechSynthesis;
   if (!synth) return;
@@ -129,42 +122,16 @@ async function playBlob(blob: Blob) {
   return url;
 }
 
-function cloudTtsUrl(text: string, lang: VoiceLang) {
-  const q = encodeURIComponent(text.slice(0, 180));
-  const tl = googleTtsCode(lang);
-  return `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${tl}&q=${q}`;
-}
-
-async function speakCloud(script: string, lang: VoiceLang): Promise<boolean> {
-  const chunks: string[] = [];
-  let rest = script.trim();
-  while (rest.length > 160) {
-    let cut = rest.lastIndexOf(" ", 160);
-    if (cut < 40) cut = 160;
-    chunks.push(rest.slice(0, cut).trim());
-    rest = rest.slice(cut).trim();
-  }
-  if (rest) chunks.push(rest);
-  for (const chunk of chunks.slice(0, 5)) {
-    const url = cloudTtsUrl(chunk, lang);
-    const ok = await new Promise<boolean>((resolve) => {
-      const audio = new Audio(url);
-      current = audio;
-      let settled = false;
-      const done = (success: boolean) => {
-        if (settled) return;
-        settled = true;
-        if (current === audio) current = null;
-        resolve(success);
-      };
-      audio.onended = () => done(true);
-      audio.onerror = () => done(false);
-      void audio.play().then(() => {}).catch(() => done(false));
-      window.setTimeout(() => done(true), 12_000);
-    });
-    if (!ok) return false;
-  }
-  return true;
+async function speakElevenLabs(script: string, lang: VoiceLang): Promise<string | null> {
+  const res = await fetch("/api/agent-tts", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text: script, lang }),
+  });
+  if (!res.ok) return null;
+  const blob = await res.blob();
+  if (blob.size < 200) return null;
+  return playBlob(blob);
 }
 
 export async function speakAgentReply(text: string, lang: VoiceLang): Promise<string | null> {
@@ -173,8 +140,8 @@ export async function speakAgentReply(text: string, lang: VoiceLang): Promise<st
   const script = voiceScript(text);
   const replyLang = lang || "en";
   try {
-    const ok = await speakCloud(script, replyLang);
-    if (ok) return null;
+    const url = await speakElevenLabs(script, replyLang);
+    if (url) return url;
   } catch {
     /* browser fallback */
   }
@@ -206,7 +173,7 @@ export async function requestMicPermission(): Promise<{ ok: boolean; error?: str
       return { ok: false, error: permissionHelp() };
     }
     if (name === "NotFoundError") {
-      return { ok: false, error: "مائیکروفون نہیں ملا۔ ہیڈسیٹ یا فون مائیک چیک کریں۔" };
+      return { ok: false, error: "مائیکروفون نہیں ملا۔ ہیڈسٹ یا فون مائیک چیک کریں۔" };
     }
     if (name === "NotReadableError") {
       return { ok: false, error: "مائیکروفون کسی اور ایپ میں لگا ہے۔ اسے بند کر کے دوبارہ کوشش کریں۔" };
