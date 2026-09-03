@@ -1,7 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { synthesizeAgentSpeech } from "../../../scripts/agent-tts.mjs";
+import { clientIpFromHeaders, rateLimit } from "@/lib/server/rate-limit";
 
 async function handle(request: Request) {
+  const ip = clientIpFromHeaders(request.headers);
+  const limited = rateLimit(`tts:${ip}`, 20, 60_000);
+  if (!limited.ok) {
+    return Response.json(
+      { error: "tts_unavailable" },
+      { status: 429, headers: { "Retry-After": String(limited.retryAfter) } },
+    );
+  }
   let body: { text?: string; lang?: string } = {};
   try {
     body = (await request.json()) as { text?: string; lang?: string };

@@ -7,29 +7,17 @@ import { join } from "node:path";
 /** One restaurant-friendly female house voice family. */
 function voiceFor(lang) {
   const key = String(lang || "ur").toLowerCase();
-  if (key === "ur") return "ur-PK-UzmaNeural";
-  if (key === "hi") return "hi-IN-SwaraNeural";
-  if (key === "pa") return "hi-IN-SwaraNeural";
-  if (key === "ru") return "ur-PK-UzmaNeural";
-  if (key === "en") return "ur-PK-UzmaNeural";
+  if (key === "en") return "en-IN-NeerjaNeural";
+  if (key === "hi" || key === "pa") return "hi-IN-SwaraNeural";
   return "ur-PK-UzmaNeural";
 }
 
-function cloneReady() {
-  return (
-    process.env.VOICE_CLONE_PERMISSION === "true" &&
-    Boolean(process.env.ELEVENLABS_API_KEY) &&
-    Boolean(process.env.ELEVENLABS_VOICE_ID)
-  );
+function elevenReady() {
+  return Boolean(process.env.ELEVENLABS_API_KEY) && Boolean(process.env.ELEVENLABS_VOICE_ID);
 }
 
-/**
- * Instant clone TTS. Only runs when owner permission + API key + voice id are set.
- * @param {string} text
- * @returns {Promise<Buffer | null>}
- */
 async function synthesizeClonedSpeech(text) {
-  if (!cloneReady()) return null;
+  if (!elevenReady()) return null;
   const voiceId = process.env.ELEVENLABS_VOICE_ID;
   const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
     method: "POST",
@@ -54,11 +42,6 @@ async function synthesizeClonedSpeech(text) {
   return buf.length > 200 ? buf : null;
 }
 
-/**
- * @param {string} text
- * @param {string} [lang]
- * @returns {Promise<Buffer>}
- */
 async function synthesizeHouseSpeech(text, lang = "ur") {
   const voice = voiceFor(lang);
   const out = join(tmpdir(), `chuski-tts-${randomBytes(6).toString("hex")}.mp3`);
@@ -96,11 +79,6 @@ asyncio.run(main())
   }
 }
 
-/**
- * @param {string} text
- * @param {string} [lang]
- * @returns {Promise<Buffer>}
- */
 export async function synthesizeAgentSpeech(text, lang = "ur") {
   const clean = String(text ?? "")
     .replace(/\s+/g, " ")
