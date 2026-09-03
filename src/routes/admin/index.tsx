@@ -43,7 +43,17 @@ function Overview() {
 
   return (
     <div>
-      <h1 className="font-display text-3xl tracking-wide">Overview</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="font-display text-3xl tracking-wide">Overview</h1>
+        <a
+          href="/#menu"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex h-11 items-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-fg"
+        >
+          Open Customer Menu
+        </a>
+      </div>
       <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {cards.map((c) => (
           <div key={c.label} className="rounded-xl bg-surface p-4 shadow-[var(--shadow-card)]">

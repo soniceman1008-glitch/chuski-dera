@@ -137,6 +137,14 @@ export function AdminShell({ children }: { children?: ReactNode }) {
             <span className="font-display text-xl tracking-wide">Admin</span>
           </div>
           {nav}
+          <a
+            href="/#menu"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mx-3 mb-3 flex h-11 items-center rounded-md px-3 text-sm font-medium text-muted hover:bg-elevated hover:text-fg"
+          >
+            Customer Menu Preview
+          </a>
         </aside>
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="flex h-16 items-center justify-between gap-3 border-b border-border px-4">
@@ -150,9 +158,14 @@ export function AdminShell({ children }: { children?: ReactNode }) {
             </button>
             <p className="hidden text-sm text-muted md:block">Chuski Dera dashboard</p>
             <div className="ml-auto flex items-center gap-3">
-              <Link to="/" className="text-sm text-muted hover:text-fg">
-                View site
-              </Link>
+              <a
+                href="/#menu"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-muted hover:text-fg"
+              >
+                Customer Menu Preview
+              </a>
               <button
                 type="button"
                 className="text-sm text-muted hover:text-fg"
@@ -178,6 +191,15 @@ export function AdminShell({ children }: { children?: ReactNode }) {
               </button>
             </div>
             {nav}
+            <a
+              href="/#menu"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mx-3 mt-2 flex h-11 items-center rounded-md px-3 text-sm font-medium text-muted hover:bg-elevated hover:text-fg"
+              onClick={() => setOpen(false)}
+            >
+              Customer Menu Preview
+            </a>
           </div>
         </div>
       )}
