@@ -73,16 +73,9 @@ export function WhatsAppAgent({
       setState(next);
       const hello = greet("ur");
       const id = idRef.current++;
-      setMsgs([{ id, role: "bot", text: hello, voice: true, lang: "ur" }]);
+      setMsgs([{ id, role: "bot", text: hello, voice: false, lang: "ur" }]);
       setBooted(true);
-      setPhase("speaking");
-      void speakAgentReply(hello, "ur").then((url) => {
-        if (url) {
-          urlsRef.current.push(url);
-          setMsgs((m) => m.map((row) => (row.id === id ? { ...row, audioUrl: url } : row)));
-        }
-        setPhase("idle");
-      });
+      setPhase("idle");
     }
   }, [open, booted, customer]);
 
@@ -126,12 +119,12 @@ export function WhatsAppAgent({
 
     if (viaVoice && isVoiceUnclear(value)) {
       if (audioUrl) push("user", "", true, audioUrl, stateRef.current.lang);
-      const ask = clarifyLanguage("ur");
+      const ask = clarifyLanguage(stateRef.current.lang);
       window.setTimeout(() => {
         void (async () => {
-          push("bot", ask, true, null, "ur");
+          push("bot", ask, true, null, stateRef.current.lang);
           setPhase("speaking");
-          await speakAgentReply(ask, "ur");
+          await speakAgentReply(ask, stateRef.current.lang);
           setPhase("idle");
         })();
       }, 200);
@@ -140,18 +133,21 @@ export function WhatsAppAgent({
 
     if (!value) return;
 
-    if (viaVoice) push("user", value, true, audioUrl, "ur");
+    if (viaVoice) push("user", value, true, audioUrl);
     else push("user", value, false);
     setDraft("");
     const result = agentReply(stateRef.current, value);
     setState(result.state);
     stateRef.current = result.state;
+    const replyLang = result.state.lang;
     window.setTimeout(() => {
       void (async () => {
         for (const line of result.messages) {
-          push("bot", line, true, null, "ur");
-          setPhase("speaking");
-          await speakAgentReply(line, "ur");
+          push("bot", line, viaVoice, null, replyLang);
+          if (viaVoice) {
+            setPhase("speaking");
+            await speakAgentReply(line, replyLang);
+          }
         }
         setPhase("idle");
         if (result.sendWhatsApp && result.state.lines.length) {
@@ -270,9 +266,9 @@ export function WhatsAppAgent({
       const ask = clip.error;
       window.setTimeout(() => {
         void (async () => {
-          push("bot", ask, true, null, "ur");
+          push("bot", ask, true, null, stateRef.current.lang);
           setPhase("speaking");
-          await speakAgentReply(ask, "ur");
+          await speakAgentReply(ask, stateRef.current.lang);
           setPhase("idle");
         })();
       }, 200);
@@ -284,7 +280,7 @@ export function WhatsAppAgent({
   async function replayBot(msg: ChatMsg) {
     stopAgentVoice();
     setPhase("speaking");
-    await speakAgentReply(msg.text, "ur");
+    await speakAgentReply(msg.text, msg.lang ?? stateRef.current.lang);
     setPhase("idle");
   }
 
@@ -306,7 +302,7 @@ export function WhatsAppAgent({
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold">{RESTAURANT.name}</p>
-            <p className="truncate text-xs text-white/80">{AGENT_PHONE_DISPLAY} · اردو ایجنٹ</p>
+            <p className="truncate text-xs text-white/80">{AGENT_PHONE_DISPLAY} · voice = same language · text = text</p>
           </div>
           <button type="button" onClick={onClose} className="grid size-11 place-items-center rounded-full hover:bg-white/10" aria-label="Close chat">
             <X className="size-5" />
