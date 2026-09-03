@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { formatRs, type MenuItem } from "@/lib/menu";
 import { qtyOf, useCart } from "@/lib/cart-store";
 import { QtyStepper } from "@/components/qty-stepper";
@@ -5,6 +6,7 @@ import { useHasMounted } from "@/lib/use-has-mounted";
 import { playChoiceVoice } from "@/lib/choice-voice";
 
 export function FoodCard({ item }: { item: MenuItem }) {
+  const [broken, setBroken] = useState(false);
   const mounted = useHasMounted();
   const lines = useCart((s) => s.lines);
   const add = useCart((s) => s.add);
@@ -24,18 +26,23 @@ export function FoodCard({ item }: { item: MenuItem }) {
         className="aspect-[4/3] w-full cursor-pointer overflow-hidden border-0 bg-elevated p-0 text-left"
         aria-label={`Add ${item.name} to cart`}
       >
-        <picture>
-          <source type="image/webp" srcSet={item.image.replace(/\.jpe?g$/i, ".webp")} />
-          <img
-            src={item.image}
-            alt={item.name}
-            width={800}
-            height={600}
-            loading="lazy"
-            decoding="async"
-            className="size-full object-cover transition-transform duration-500 ease-[var(--ease-smooth-out)] group-hover:scale-[1.04]"
-          />
-        </picture>
+        {broken || !item.image ? (
+          <div className="grid size-full place-items-center bg-elevated text-xs text-muted">{item.name}</div>
+        ) : (
+          <picture>
+            <source type="image/webp" srcSet={item.image.replace(/\.jpe?g$/i, ".webp")} />
+            <img
+              src={item.image}
+              alt={item.name}
+              width={800}
+              height={600}
+              loading="lazy"
+              decoding="async"
+              className="size-full object-cover transition-transform duration-500 ease-[var(--ease-smooth-out)] group-hover:scale-[1.04]"
+              onError={() => setBroken(true)}
+            />
+          </picture>
+        )}
       </button>
       <div className="flex flex-1 flex-col gap-3 p-4">
         <div className="flex-1">

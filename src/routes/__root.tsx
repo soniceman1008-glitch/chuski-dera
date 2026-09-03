@@ -21,14 +21,19 @@ const LOCAL_BUSINESS = {
   image: `${SITE}/og.jpg`,
   url: SITE,
   telephone: "+923139235654",
+  menu: `${SITE}/#menu`,
+  hasMenu: `${SITE}/#menu`,
+  areaServed: "Jhang",
   address: {
     "@type": "PostalAddress",
     streetAddress: "Satellite Town B Block, Green Belt",
     addressLocality: "Jhang",
+    addressRegion: "Punjab",
     addressCountry: "PK",
   },
   servesCuisine: ["Pakistani", "Fast food"],
   priceRange: "PKR",
+  acceptsReservations: "False",
 };
 
 function NotFoundPage() {
@@ -64,9 +69,12 @@ export const Route = createRootRoute({
       { property: "og:description", content: DESCRIPTION },
       { property: "og:url", content: SITE },
       { property: "og:image", content: `${SITE}/og.jpg` },
+      { property: "og:image:width", content: "1200" },
+      { property: "og:image:height", content: "630" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: APP_NAME },
       { name: "twitter:description", content: DESCRIPTION },
+      { name: "twitter:image", content: `${SITE}/og.jpg` },
     ],
     links: [
       { rel: "canonical", href: SITE },
